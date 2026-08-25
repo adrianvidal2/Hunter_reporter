@@ -1,0 +1,17 @@
+import { loadOrcaSettings } from './src/core/orca/settings'
+import { appendLaunch, readLaunches } from './src/server/launches'
+import { resolveSafe } from './src/core/fs/paths'
+import { runOrcaLaunch } from './src/core/orca/runner'
+
+const root = process.argv[2]!
+// lanzamiento simulado con el binario fake
+const out = await runOrcaLaunch({
+  bin: '/tmp/orca-fake/orca',
+  repoPath: resolveSafe('demo_project', root),
+  worktreeName: 'example-program-pi-1',
+  prompt: 'busca XSS',
+})
+console.log('resultado:', JSON.stringify(out))
+// append y lectura
+appendLaunch('demo_project', { timestamp: Date.now(), provider: 'pi', scopeSeleccionado: ['https://a.test'], mode: 'orca', ok: false, error: out.message }, root)
+console.log('launches:', JSON.stringify(readLaunches('demo_project', root)))

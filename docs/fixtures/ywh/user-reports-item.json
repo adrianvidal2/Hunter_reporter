@@ -1,0 +1,56 @@
+{
+  "id": 123456,
+  "local_id": "YWH-000000",
+  "title": "Anonymized report title",
+  "scope": "https://example-anonymized.com/target",
+  "program": {
+    "title": "Anonymized Program",
+    "slug": "anonymized-program-1",
+    "type": "bug-bounty",
+    "status": "V",
+    "disabled": false,
+    "public": false,
+    "hall_of_fame": false,
+    "hacktivity": false,
+    "bounty": true,
+    "gift": false,
+    "demo": false,
+    "secured": false,
+    "archived": false,
+    "banner": {
+      "name": "51031fd7-6008-46fd-989f-a3e9e0dad99a",
+      "original_name": null,
+      "mime_type": null,
+      "size": null,
+      "url": "https://cdn-yeswehack.com/program/banner/51031fd7-6008-46fd-989f-a3e9e0dad99a"
+    },
+    "thumbnail": {
+      "name": "cbd00b5b-5a8a-4873-8ab3-5c9cfa54c11b",
+      "original_name": null,
+      "mime_type": null,
+      "size": null,
+      "url": "https://cdn-yeswehack.com/program/thumbnail/cbd00b5b-5a8a-4873-8ab3-5c9cfa54c11b"
+    },
+    "partitioning": true
+  },
+  "status": {
+    "workflow_state": "under_review"
+  },
+  "cvss": {
+    "criticity": "C",
+    "vector": "CVSS:3.1/AV:N/AC:L/PR:N/UI:N/S:C/C:H/I:H/A:H",
+    "score": 10,
+    "version": "v3.1"
+  },
+  "hunter": {
+    "username": "anonymized-hunter"
+  },
+  "reward": 0,
+  "cost_credits": null,
+  "currency": "EUR",
+  "marked_as": "R",
+  "collaborative": false,
+  "created_at": "2026-08-20T17:44:34+02:00",
+  "changed_at": "2026-08-20T17:49:07+02:00",
+  "ask_for_fix_verification_status": "UNKNOWN"
+}

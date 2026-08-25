@@ -1,0 +1,127 @@
+@import "tailwindcss";
+
+:root {
+  --background: #ffffff;
+  --foreground: #171717;
+}
+
+@theme inline {
+  --color-background: var(--background);
+  --color-foreground: var(--foreground);
+  --font-sans: var(--font-geist-sans);
+  --font-mono: var(--font-geist-mono);
+}
+
+@media (prefers-color-scheme: dark) {
+  :root {
+    --background: #0a0a0a;
+    --foreground: #ededed;
+  }
+}
+
+body {
+  background: var(--background);
+  color: var(--foreground);
+  font-family: Arial, Helvetica, sans-serif;
+}
+
+/* ── Selects y dropdowns (legibilidad global) ──────────────────────────
+   Las opciones del desplegable aparecían en gris claro casi ilegible.
+   Aquí se fija el contraste base de select y option para TODOS los
+   selectores de la app, en modo claro y oscuro.
+
+   color-scheme hace que el menú nativo (el <option> desplegado por el
+   navegador) use el esquema de color acorde al tema, en vez de pintar
+   texto gris sobre fondo claro. Sin esto, el contraste lo decide el
+   navegador y sale mal. */
+
+select {
+  /* Hereda apariencia: los selects de la app ya fijan border/bg/padding
+     con Tailwind, así que aquí solo se asegura el contraste del texto y
+     que el menú use el color-scheme correcto. */
+  color: var(--foreground);
+  color-scheme: light dark;
+}
+
+/* En el menú desplegado, el texto de las opciones debe ser legible sobre
+   el fondo nativo del sistema. color-scheme ya lo ajusta; un color
+   explícito garantiza contraste cuando el navegador pinta el panel. */
+option {
+  color: #171717; /* texto oscuro → legible sobre fondo claro nativo */
+  background: #ffffff;
+  color-scheme: light dark;
+}
+
+@media (prefers-color-scheme: dark) {
+  option {
+    color: #ededed; /* texto claro → legible sobre fondo oscuro nativo */
+    background: #171717;
+  }
+}
+
+/* ── Preview de markdown (paso 4.4) ───────────────────────────────────
+   Colores derivados de currentColor con color-mix: se adaptan solos al
+   modo claro/oscuro sin duplicar reglas. */
+
+.markdown-preview {
+  line-height: 1.65;
+  font-size: 0.925rem;
+  word-wrap: break-word;
+}
+.markdown-preview h1,
+.markdown-preview h2,
+.markdown-preview h3,
+.markdown-preview h4 {
+  font-weight: 600;
+  line-height: 1.3;
+  margin: 1.4rem 0 0.6rem;
+}
+.markdown-preview h1 { font-size: 1.5rem; }
+.markdown-preview h2 { font-size: 1.25rem; }
+.markdown-preview h3 { font-size: 1.05rem; }
+.markdown-preview h1:first-child,
+.markdown-preview h2:first-child,
+.markdown-preview h3:first-child { margin-top: 0; }
+.markdown-preview p { margin: 0.6rem 0; }
+.markdown-preview ul { list-style: disc; }
+.markdown-preview ol { list-style: decimal; }
+.markdown-preview ul,
+.markdown-preview ol { margin: 0.6rem 0; padding-left: 1.4rem; }
+.markdown-preview li { margin: 0.25rem 0; }
+.markdown-preview code {
+  font-family: var(--font-geist-mono), monospace;
+  font-size: 0.85em;
+  background: color-mix(in srgb, currentColor 8%, transparent);
+  padding: 0.1rem 0.35rem;
+  border-radius: 0.25rem;
+}
+.markdown-preview pre {
+  background: color-mix(in srgb, currentColor 6%, transparent);
+  padding: 0.75rem 1rem;
+  border-radius: 0.5rem;
+  overflow-x: auto;
+  margin: 0.8rem 0;
+}
+.markdown-preview pre code { background: transparent; padding: 0; font-size: 0.85em; }
+.markdown-preview blockquote {
+  border-left: 3px solid color-mix(in srgb, currentColor 25%, transparent);
+  padding-left: 1rem;
+  opacity: 0.85;
+  margin: 0.8rem 0;
+}
+.markdown-preview table { border-collapse: collapse; margin: 0.8rem 0; }
+.markdown-preview th,
+.markdown-preview td {
+  border: 1px solid color-mix(in srgb, currentColor 20%, transparent);
+  padding: 0.35rem 0.65rem;
+  text-align: left;
+}
+.markdown-preview th { background: color-mix(in srgb, currentColor 6%, transparent); font-weight: 600; }
+.markdown-preview a { color: #3b82f6; text-decoration: underline; }
+.markdown-preview hr {
+  border: 0;
+  border-top: 1px solid color-mix(in srgb, currentColor 20%, transparent);
+  margin: 1.2rem 0;
+}
+.markdown-preview img { max-width: 100%; border-radius: 0.25rem; }
+.markdown-preview input[type='checkbox'] { margin-right: 0.4rem; }

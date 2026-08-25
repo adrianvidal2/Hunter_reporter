@@ -1,0 +1,225 @@
+{
+  "title": "Anonymized Program",
+  "slug": "anonymized-program-1",
+  "rules": "# Description\n\nAnonymized program description. Rules truncated for the contract fixture; see live for full text.",
+  "rules_html": "<h1>Description</h1><p>Anonymized program description.</p>",
+  "type": "bug-bounty",
+  "status": "V",
+  "demo": false,
+  "public": false,
+  "bounty": true,
+  "gift": false,
+  "hall_of_fame": false,
+  "hacktivity": false,
+  "report_count_per_scope": false,
+  "report_collaboration_active": true,
+  "pid": "anonymized-pid",
+  "secured": false,
+  "triaged": null,
+  "disabled": false,
+  "vdp": false,
+  "reports_count": 15,
+  "reports_imported_count": null,
+  "bounty_reward_min": 50,
+  "bounty_reward_max": 1000,
+  "scopes_count": 1,
+  "archived": false,
+  "thumbnail": {
+    "name": "anon-uuid-thumbnail",
+    "original_name": "anon-thumbnail.png",
+    "mime_type": "image/jpeg",
+    "size": 3725,
+    "url": "https://cdn-yeswehack.com/program/thumbnail/anon"
+  },
+  "event": null,
+  "business_unit": {
+    "name": "Business Unit 1",
+    "slug": "business-unit-1",
+    "description": "Anonymized business unit description.",
+    "currency": "EUR",
+    "already_activate_product": true,
+    "logo": {
+      "name": "anon-uuid",
+      "original_name": null,
+      "mime_type": "image/png",
+      "size": 5673,
+      "url": "https://cdn-yeswehack.com/business-unit/logo/anon"
+    }
+  },
+  "vpn_outbound_ips": null,
+  "id": null,
+  "scopes": [
+    {
+      "scope": "https://example-anonymized.com/target",
+      "scope_type": "web-application",
+      "scope_type_name": "Web application",
+      "asset_value": "HIGH",
+      "report_count": null
+    }
+  ],
+  "out_of_scope": [
+    "All domains or subdomains not listed in the above list of 'Scopes'."
+  ],
+  "qualifying_vulnerability": [
+    "SQL Injection (SQLi)",
+    "Cross-Site Scripting (XSS)",
+    "Remote Code Execution (RCE)",
+    "Insecure Direct Object Reference (IDOR)",
+    "Horizontal and vertical privilege escalation",
+    "Authentication bypass & broken authentication",
+    "Business Logic Errors vulnerability with real security impact",
+    "Local files access and manipulation (LFI, RFI, XXE, SSRF, XSPA)",
+    "Cross-Origin Resource Sharing (CORS) with real security impact",
+    "Cross-site Request Forgery (CSRF) with real security impact",
+    "Open Redirect",
+    "Exposed secrets, credentials or sensitive information on an asset under our control and affecting at least one of our scopes"
+  ],
+  "non_qualifying_vulnerability": [
+    "Broken Link/Social media Hijacking",
+    "Tabnabbing",
+    "Missing cookie flags",
+    "Content/Text injections",
+    "Clickjacking/UI redressing",
+    "Denial of Service (DoS) attacks",
+    "Recently disclosed CVEs (less than 30 days sinces patch release)",
+    "CVEs without exploitable vulnerabilities and PoC",
+    "Open ports or services without exploitable vulnerabilities and PoC",
+    "Social engineering of staff or contractors",
+    "Presence of autocomplete attribute on web forms",
+    "Vulnerabilities affecting outdated browsers or platforms",
+    "Self-XSS or XSS that cannot be used to impact other users",
+    "Any hypothetical flaw or best practices without exploitable vulnerabilities and PoC",
+    "SSL/TLS issues (e.g. expired certificates, best practices)",
+    "Unexploitable vulnerabilities (e.g. Self-XSS, XSS or Open Redirect through HTTP headers...)",
+    "Reports with attack scenarios requiring MITM or physical access to victim's device",
+    "Missing security-related HTTP headers which do not lead directly to an exploitable vulnerability and PoC",
+    "Low severity Cross-Site Request Forgery (CSRF) (e.g. Unauthenticated / Logout / Login / Products cart updates...)",
+    "Invalid or missing email security records (e.g. SPF, DKIM, DMARC)",
+    "Session management issues (e.g. lack of expiration, no logout on password change, concurrent sessions)",
+    "Disclosure of information without exploitable vulnerabilities and PoC (e.g. stack traces, path disclosure, directory listings, software versions, IP disclosure, 3rd party secrets, EXIF Metadata, Origin IP)",
+    "CSV injection",
+    "Malicious file upload (e.g. EICAR files, .EXE)",
+    "HTTP Strict Transport Security Header (HSTS)",
+    "Subdomain takeover without a full exploitable vulnerability and PoC or not applicable to the scope",
+    "Blind SSRF without exploitable vulnerabilities and PoC (e.g. DNS & HTTP pingback, Wordpress XMLRPC)",
+    "Lack or bypass of rate-limiting, brute-forcing or captcha issues",
+    "User enumeration (e.g. email, alias, GUID, phone number, common CMS endpoints)",
+    "Weak password policies (e.g. length, complexity, reuse)",
+    "Ability to spam users (email / SMS / direct messages flooding)",
+    "Disclosed or misconfigured public API keys (e.g. Google Maps, Firebase, analytics tools...)",
+    "Password reset token sent via HTTP referer to external services (e.g. analytics / ads platforms)",
+    "Stolen secrets, credentials or information gathered from a third-party asset that we have no control over",
+    "Exposed secrets, credentials or information on an asset under our control that are not applicable to the program’s scope",
+    "Pre-account takeover (e.g. account creation via oAuth)",
+    "GraphQL Introspection is enabled",
+    "Vulnerabilities related to the use of coupon/promotion codes",
+    "Task Hijacking",
+    "Crashing your own application"
+  ],
+  "disclose_bounty_min_reward": null,
+  "disclose_bounty_average_reward": null,
+  "disclose_bounty_max_reward": null,
+  "reward_grid_default": {
+    "bounty_low": null,
+    "bounty_medium": null,
+    "bounty_high": null,
+    "bounty_critical": null
+  },
+  "reward_grid_very_low": {
+    "bounty_low": null,
+    "bounty_medium": null,
+    "bounty_high": null,
+    "bounty_critical": null
+  },
+  "reward_grid_low": {
+    "bounty_low": null,
+    "bounty_medium": null,
+    "bounty_high": null,
+    "bounty_critical": null
+  },
+  "reward_grid_medium": {
+    "bounty_low": null,
+    "bounty_medium": null,
+    "bounty_high": null,
+    "bounty_critical": null
+  },
+  "reward_grid_high": {
+    "bounty_low": 50,
+    "bounty_medium": 300,
+    "bounty_high": 700,
+    "bounty_critical": 1000
+  },
+  "reward_grid_critical": {
+    "bounty_low": null,
+    "bounty_medium": null,
+    "bounty_high": null,
+    "bounty_critical": null
+  },
+  "tags": null,
+  "vpn_active": false,
+  "vpn_ips": null,
+  "account_access": "You can self-register.",
+  "account_access_html": "<p>You can self-register.</p>",
+  "user_agent": "BugBounty-YWH-AnonymizedBrand",
+  "disable_message": null,
+  "stats": {
+    "max_reward": null,
+    "average_reward": null,
+    "average_first_time_response": 1,
+    "total_reports": 15,
+    "total_reports_last24_hours": 0,
+    "total_reports_last7_days": 1,
+    "total_reports_current_month": 6
+  },
+  "supported_languages": [
+    "GB"
+  ],
+  "report_import_nb_max": null,
+  "report_import_line_max": null,
+  "banner": {
+    "name": "anon-uuid-banner",
+    "original_name": "anon-banner.png",
+    "mime_type": "image/png",
+    "size": 2018102,
+    "url": "https://cdn-yeswehack.com/program/banner/anon"
+  },
+  "restricted_ips": null,
+  "has_pending_version": null,
+  "rights": [
+    "view",
+    "create_report",
+    "leave_as_hunter",
+    "view_credential_pool"
+  ],
+  "attachments": null,
+  "hunter_message_enabled": null,
+  "send_hunter_message_validation_required": null,
+  "max_credential_pool_number": null,
+  "videos_attachments_enabled": true,
+  "sla_enabled": null,
+  "sla_grid": null,
+  "systemic_issue_rule_enabled": true,
+  "systemic_issue_rule_grid": {
+    "level1": 100,
+    "level2": 100,
+    "level3": 75,
+    "level4": 50,
+    "level5": 25,
+    "level6": 10
+  },
+  "leakage_rule_enabled": true,
+  "leakage_rule_grid_in_scope": {
+    "fully_in_scope": true,
+    "partially_in_scope": true,
+    "out_of_scope": false
+  },
+  "leakage_rule_grid_out_of_scope": {
+    "fully_in_scope": true,
+    "partially_in_scope": false,
+    "out_of_scope": false
+  },
+  "ywh_triager_user_agent": null,
+  "report_submission_cost": 1,
+  "credit_balance": 8,
+  "credit_balance_projected": 7
+}
