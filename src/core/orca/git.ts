@@ -92,7 +92,11 @@ export async function ensureGitRepo(
   const git = options.git ?? defaultGitExec()
   if (await isGitRepo(dir, git)) return { initialized: false }
 
-  await git(['init', '-b', 'main'])
+  // git init real puede fallar (p. ej. .git bloqueado): propagar la causa.
+  const init = await git(['init', '-b', 'main'])
+  if (init.code !== 0) {
+    throw new Error(`git init falló: ${init.stderr.trim() || init.stdout.trim() || 'código ' + init.code}`)
+  }
   if (!(await hasUserConfig(git))) {
     await git(['config', 'user.name', options.defaultUserName ?? DEFAULT_NAME])
     await git(['config', 'user.email', options.defaultUserEmail ?? DEFAULT_EMAIL])
@@ -102,8 +106,14 @@ export async function ensureGitRepo(
   const { join } = await import('node:path')
   await appendGitIgnore(join(dir, '.gitignore'))
 
-  await git(['add', '-A'])
-  await git(['commit', '-m', 'init', '--allow-empty', '--no-verify'])
+  const add = await git(['add', '-A'])
+  if (add.code !== 0) {
+    throw new Error(`git add falló: ${add.stderr.trim() || add.stdout.trim() || 'código ' + add.code}`)
+  }
+  const commit = await git(['commit', '-m', 'init', '--allow-empty', '--no-verify'])
+  if (commit.code !== 0) {
+    throw new Error(`git commit falló: ${commit.stderr.trim() || commit.stdout.trim() || 'código ' + commit.code}`)
+  }
   return { initialized: true }
 }
 

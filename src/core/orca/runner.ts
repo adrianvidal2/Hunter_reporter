@@ -122,7 +122,11 @@ export async function ensureRepoRegistered(
   }
 
   // 2a) git init local si falta (idempotente: si ya es repo, no repite)
-  await ensureGitRepo(repoPath, git ? { git } : {})
+  try {
+    await ensureGitRepo(repoPath, git ? { git } : {})
+  } catch (err) {
+    return { ok: false, message: err instanceof Error ? err.message : 'No se pudo preparar el repo git local' }
+  }
 
   // 2b) repo add
   const added = await opts.exec(bin, ['repo', 'add', '--path', repoPath, '--json'])
