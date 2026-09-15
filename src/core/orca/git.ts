@@ -46,9 +46,9 @@ export async function isGitRepo(dir: string, git: GitExec): Promise<boolean> {
 }
 
 /** ¿git tiene user.name/email configurados (local o global)? */
-async function hasUserConfig(git: GitExec): Promise<boolean> {
-  const name = await git(['config', '--get', 'user.name'])
-  const email = await git(['config', '--get', 'user.email'])
+async function hasUserConfig(git: GitExec, cwd?: string): Promise<boolean> {
+  const name = await git(['config', '--get', 'user.name'], cwd)
+  const email = await git(['config', '--get', 'user.email'], cwd)
   return name.code === 0 && email.code === 0 && name.stdout.trim() !== '' && email.stdout.trim() !== ''
 }
 
@@ -93,24 +93,24 @@ export async function ensureGitRepo(
   if (await isGitRepo(dir, git)) return { initialized: false }
 
   // git init real puede fallar (p. ej. .git bloqueado): propagar la causa.
-  const init = await git(['init', '-b', 'main'])
+  const init = await git(['init', '-b', 'main'], dir)
   if (init.code !== 0) {
     throw new Error(`git init falló: ${init.stderr.trim() || init.stdout.trim() || 'código ' + init.code}`)
   }
-  if (!(await hasUserConfig(git))) {
-    await git(['config', 'user.name', options.defaultUserName ?? DEFAULT_NAME])
-    await git(['config', 'user.email', options.defaultUserEmail ?? DEFAULT_EMAIL])
+  if (!(await hasUserConfig(git, dir))) {
+    await git(['config', 'user.name', options.defaultUserName ?? DEFAULT_NAME], dir)
+    await git(['config', 'user.email', options.defaultUserEmail ?? DEFAULT_EMAIL], dir)
   }
 
   // Respetar el .gitignore local: pentest/ nunca se comitea (credenciales)
   const { join } = await import('node:path')
   await appendGitIgnore(join(dir, '.gitignore'))
 
-  const add = await git(['add', '-A'])
+  const add = await git(['add', '-A'], dir)
   if (add.code !== 0) {
     throw new Error(`git add falló: ${add.stderr.trim() || add.stdout.trim() || 'código ' + add.code}`)
   }
-  const commit = await git(['commit', '-m', 'init', '--allow-empty', '--no-verify'])
+  const commit = await git(['commit', '-m', 'init', '--allow-empty', '--no-verify'], dir)
   if (commit.code !== 0) {
     throw new Error(`git commit falló: ${commit.stderr.trim() || commit.stdout.trim() || 'código ' + commit.code}`)
   }

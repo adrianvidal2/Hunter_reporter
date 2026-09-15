@@ -1,4 +1,4 @@
-import { mkdtempSync, writeFileSync, rmSync, mkdirSync } from 'node:fs'
+import { mkdtempSync, writeFileSync, rmSync, mkdirSync, existsSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import { afterAll, describe, expect, it } from 'vitest'
@@ -7,11 +7,10 @@ import { readProgramFile, readProjectProgram, projectProgramPath } from './progr
 const dir = mkdtempSync(join(tmpdir(), 'ywh-program-file-'))
 const fixture = join(dir, 'programa.json')
 
-// Root de proyecto simulado: <root>/proyectoX/programa.json
+// Root de proyecto simulado: <root>/proyectoX/pentest/programa.json
 const root = join(dir, 'root')
 const projDir = join(root, 'proyectoX')
 mkdirSync(projDir, { recursive: true })
-const projFile = join(projDir, 'programa.json')
 
 afterAll(() => rmSync(dir, { recursive: true, force: true }))
 
@@ -68,13 +67,41 @@ describe('readProgramFile (pestaña Programa, solo lectura local)', () => {
   })
 })
 
-describe('readProjectProgram (por proyecto, programa.json)', () => {
-  it('lee el programa.json del proyecto dado (ruta segura dentro del root)', () => {
-    writeFileSync(projFile, JSON.stringify(minProgram({ slug: 'proyecto-x' })))
+describe('readProjectProgram (por proyecto, pentest/programa.json)', () => {
+  it('lee el programa.json canónico de pentest/ (ruta segura dentro del root)', () => {
+    const pentestDir = join(projDir, 'pentest')
+    mkdirSync(pentestDir, { recursive: true })
+    const pentestFile = join(pentestDir, 'programa.json')
+    writeFileSync(pentestFile, JSON.stringify(minProgram({ slug: 'proyecto-x' })))
     const p = readProjectProgram('proyectoX', root)
     expect(p).not.toBeNull()
     expect(p!.slug).toBe('proyecto-x')
-    expect(projectProgramPath('proyectoX', root)).toBe(projFile)
+    expect(projectProgramPath('proyectoX', root)).toBe(pentestFile)
+  })
+
+  it('LECTURA RETROCOMPATIBLE: legacy en la raíz → se lee, se mueve a pentest/ y se borra el de la raíz', () => {
+    const legacyDir = join(root, 'heredado')
+    mkdirSync(legacyDir, { recursive: true })
+    writeFileSync(join(legacyDir, 'programa.json'), JSON.stringify(minProgram({ slug: 'heredado-1' })))
+
+    const p = readProjectProgram('heredado', root)
+    expect(p).not.toBeNull()
+    expect(p!.slug).toBe('heredado-1')
+
+    // migrado a pentest/ y el de la raíz YA NO ESTÁ
+    expect(existsSync(join(legacyDir, 'pentest', 'programa.json'))).toBe(true)
+    expect(existsSync(join(legacyDir, 'programa.json'))).toBe(false)
+    // segunda lectura: estable (ya desde pentest/)
+    expect(readProjectProgram('heredado', root)?.slug).toBe('heredado-1')
+  })
+
+  it('legacy CORRUPTO en la raíz: no se mueve ni se borra, devuelve null', () => {
+    const legacyDir = join(root, 'roto')
+    mkdirSync(legacyDir, { recursive: true })
+    writeFileSync(join(legacyDir, 'programa.json'), 'no-es-json{{')
+    expect(readProjectProgram('roto', root)).toBeNull()
+    expect(existsSync(join(legacyDir, 'programa.json'))).toBe(true)
+    expect(existsSync(join(legacyDir, 'pentest'))).toBe(false)
   })
 
   it('devuelve null si el proyecto no tiene programa.json (→ “Sin datos del programa”)', () => {

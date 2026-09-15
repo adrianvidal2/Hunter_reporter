@@ -36,7 +36,7 @@ export interface ExecResult {
 
 export type ExecImpl = (bin: string, args: string[]) => Promise<ExecResult>
 
-const defaultExec: ExecImpl = (bin, args) =>
+export const defaultExec: ExecImpl = (bin, args) =>
   new Promise((resolve) => {
     execFile(bin, args, { timeout: 120_000 }, (err, stdout, stderr) => {
       const code =
@@ -60,6 +60,22 @@ export interface OrcaLaunchInput {
   repoPath: string
   worktreeName: string
   prompt: string
+  /** id de agente Orca (flag --agent). Por defecto 'pi'. */
+  agent?: string
+}
+
+/** Resultado de la fase preparativa (status→open→registro), compartido por
+ *  todos los proveedores del lote. */
+export interface OrcaPrepareOutcome {
+  ok: boolean
+  startedReachable: boolean
+  opened: boolean
+  registered: boolean
+  registeredNow?: boolean
+  repoId?: string
+  message?: string
+  kind: 'repo_not_found' | 'unknown_agent' | 'other' | 'register'
+  status?: OrcaStatus
 }
 
 export interface OrcaLaunchOutcome {
@@ -90,8 +106,9 @@ const ERR_STATUS = 'No se pudo leer el estado de Orca.'
 export const ORCA_POLL_MS = 1500
 
 /** Combina stdout+stderr para el parseo (el JSON de --json puede venir
- *  por cualquiera de los dos, entre logs). */
-function combined(r: ExecResult): string {
+ *  por cualquiera de los dos, entre logs). Pública para reusarla en la
+ *  pestaña Escaneos. */
+export function combined(r: ExecResult): string {
   return r.stdout + '\n' + r.stderr
 }
 
@@ -138,26 +155,26 @@ export async function ensureRepoRegistered(
 }
 
 /**
- * Orquesta el lanzamiento: garantiza runtime alcanzable y crea el worktree.
- * No lanza excepciones internas: SIEMPRE devuelve un OrcaLaunchOutcome.
+ * Fase preparativa compartida: status → (open si falta) → registrar la
+ * carpeta en Orca. Se ejecuta UNA vez por lote, no por proveedor.
  */
-export async function runOrcaLaunch(input: OrcaLaunchInput, opts: OrcaRunnerOptions = {}): Promise<OrcaLaunchOutcome> {
-  const exec = opts.execParam ?? defaultExec
-  const sleep = opts.sleepMs ?? ORCA_POLL_MS
-  const openTimeoutMs = opts.openTimeoutMs ?? 60_000
-
+export async function prepareOrcaRun(
+  input: Pick<OrcaLaunchInput, 'bin' | 'repoPath'>,
+  opts: OrcaRunnerOptions & { exec?: ExecImpl } = {},
+): Promise<OrcaPrepareOutcome> {
+  const exec = opts.exec ?? defaultExec
   const bin = expandHome(input.bin)
 
-  // 1) status (parsea stdout+stderr: el JSON puede venir por cualquiera)
   const first = await exec(bin, ['status', '--json'])
   const status = parseOrcaStatus(combined(first))
   let opened = false
+  const openTimeout = opts.openTimeoutMs ?? 60_000
+  const sleep = opts.sleepMs ?? ORCA_POLL_MS
 
   if (!status.runtimeReachable) {
-    // 2) open + espera (solo si NO está ya alcanzable) con timeout
     await exec(bin, ['open'])
     opened = true
-    const deadline = Date.now() + openTimeoutMs
+    const deadline = Date.now() + openTimeout
     let reachable = false
     while (Date.now() < deadline) {
       await new Promise((r) => setTimeout(r, sleep))
@@ -169,61 +186,86 @@ export async function runOrcaLaunch(input: OrcaLaunchInput, opts: OrcaRunnerOpti
     }
     if (!reachable) {
       return {
-        ok: false,
-        startedReachable: false,
-        opened,
-        registered: false,
-        kind: 'other',
-        message: ERR_OPEN_TIMEOUT,
-        status,
+        ok: false, startedReachable: false, opened, registered: false, kind: 'other', message: ERR_OPEN_TIMEOUT, status,
       }
     }
   }
 
-  // 3) registrar la carpeta en Orca si hace falta (git init local + repo add)
   const reg = await ensureRepoRegistered(input.repoPath, { bin, exec, git: opts.git })
   if (!reg.ok) {
     return {
-      ok: false,
-      startedReachable: status.runtimeReachable,
-      opened,
-      registered: false,
-      kind: 'register',
-      message: reg.message ?? 'No se pudo registrar la carpeta en Orca',
-      status,
+      ok: false, startedReachable: status.runtimeReachable, opened, registered: false, kind: 'register',
+      message: reg.message ?? 'No se pudo registrar la carpeta en Orca', status,
     }
   }
+  return {
+    ok: true, startedReachable: status.runtimeReachable, opened, registered: true,
+    registeredNow: reg.registeredNow, repoId: reg.repoId, kind: 'other', status,
+  }
+}
 
-  // 4) worktree create (prompt tal cual, sin transformar)
+/** Resultado de crear UN worktree (por proveedor). */
+export interface OrcaCreateOutcome {
+  ok: boolean
+  handle?: string
+  agentTerminalHandle?: string
+  worktreeId?: string
+  message?: string
+  /** kind del fallo (unknown_agent si el id no es válido en Orca). */
+  kind: 'repo_not_found' | 'unknown_agent' | 'other'
+}
+
+// Hardcoded del flag prometido: agent por defecto cuando no se pasa.
+const FALLBACK_AGENT = 'pi'
+
+/** Crea un worktree con el proveedor dado (flag --agent): UNA llamada. */
+export async function createOrcaWorktreeRun(
+  input: Pick<OrcaLaunchInput, 'bin' | 'repoPath' | 'worktreeName' | 'prompt'> & { agent?: string },
+  exec: ExecImpl,
+): Promise<OrcaCreateOutcome> {
+  const bin = expandHome(input.bin)
+  const agent = input.agent ?? FALLBACK_AGENT
   const create = await exec(bin, [
     'worktree',
     'create',
     `--repo`, `path:${input.repoPath}`,
     '--name', input.worktreeName,
-    '--agent', 'pi',
+    '--agent', agent,
     '--prompt', input.prompt,
     '--json',
   ])
   const res: OrcaWorktreeResult = parseOrcaWorktree(combined(create))
+  if (res.ok) {
+    return { ok: true, handle: res.handle, agentTerminalHandle: res.agentTerminalHandle, worktreeId: res.worktreeId, kind: 'other' }
+  }
+  return { ok: false, message: res.message, kind: classifyOrcaMessage(res.message) }
+}
 
-  if (!res.ok) {
-    // classifyOrcaMessage aplana el mensaje a texto SIN crashear aunque
-    // venga como objeto/undefined.
-    const kind = classifyOrcaMessage(res.message)
-    return { ok: false, startedReachable: status.runtimeReachable, opened, registered: true, kind, message: res.message, status }
+/**
+ * Orquesta el lanzamiento (un solo proveedor): garantiza runtime alcanzable,
+ * registra la carpeta y crea el worktree. No lanza excepciones internas.
+ */
+export async function runOrcaLaunch(input: OrcaLaunchInput, opts: OrcaRunnerOptions = {}): Promise<OrcaLaunchOutcome> {
+  const exec = opts.execParam ?? defaultExec
+  const prep = await prepareOrcaRun({ bin: input.bin, repoPath: input.repoPath }, { ...opts, exec })
+  if (!prep.ok) {
+    return { ok: false, startedReachable: prep.startedReachable, opened: prep.opened, registered: false, kind: prep.kind, message: prep.message, status: prep.status }
   }
 
+  const created = await createOrcaWorktreeRun(
+    { bin: input.bin, repoPath: input.repoPath, worktreeName: input.worktreeName, prompt: input.prompt, agent: input.agent },
+    exec,
+  )
+  if (!created.ok) {
+    return {
+      ok: false, startedReachable: prep.startedReachable, opened: prep.opened, registered: true, kind: created.kind,
+      message: created.message, status: prep.status,
+    }
+  }
   return {
-    ok: true,
-    startedReachable: status.runtimeReachable,
-    opened,
-    registered: true,
-    registeredNow: reg.registeredNow,
-    repoId: reg.repoId,
-    handle: res.handle,
-    agentTerminalHandle: res.agentTerminalHandle,
-    worktreeId: res.worktreeId,
+    ok: true, startedReachable: prep.startedReachable, opened: prep.opened, registered: true,
+    registeredNow: prep.registeredNow, repoId: prep.repoId, status: prep.status,
+    handle: created.handle, agentTerminalHandle: created.agentTerminalHandle, worktreeId: created.worktreeId,
     kind: 'other',
-    status,
   }
 }

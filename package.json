@@ -9,7 +9,8 @@
     "lint": "eslint",
     "test": "vitest run",
     "db:generate": "drizzle-kit generate",
-    "db:reset": "tsx src/db/reset.ts"
+    "db:reset": "tsx src/db/reset.ts",
+    "migrate:platform": "tsx scripts/migrate-platform.ts"
   },
   "dependencies": {
     "@codemirror/lang-markdown": "^6.5.2",

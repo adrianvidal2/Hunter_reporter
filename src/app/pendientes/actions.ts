@@ -2,6 +2,8 @@
 
 import { revalidatePath } from 'next/cache'
 import { writeAtomic } from '@/core/fs/atomic'
+import { sha256Content } from '@/core/fs/hash'
+import { markOwnWrite } from '@/server/own-writes'
 import { sha256File } from '@/core/fs/hash'
 import { saveHistoryCopy } from '@/core/fs/history'
 import { PathEscapeError, resolveSafe } from '@/core/fs/paths'
@@ -71,6 +73,8 @@ export async function acceptRewriteAction(
 
   const archived = saveHistoryCopy(path, root) // 8.5: original SIEMPRE recuperable
   writeAtomic(path, markdown, { root })
+  // Escritura de la app (8.5): el watcher no debe re-detectar el fichero
+  markOwnWrite(absPath, sha256Content(markdown))
   resolvePending(path, 'approved')
 
   revalidatePath('/pendientes')

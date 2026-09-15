@@ -1,0 +1,31 @@
+{
+  "maxCount": 2,
+  "records": [
+    {
+      "id": "00000000-0000-4000-8000-000000000001",
+      "handle": "anonymized-handle-1",
+      "name": "Anonymized Company - Bug Bounty",
+      "following": false,
+      "minBounty": { "value": 50, "currency": "EUR" },
+      "maxBounty": { "value": 3000, "currency": "EUR" },
+      "confidentialityLevel": { "id": 4, "value": "Public" },
+      "status": { "id": 3, "value": "Open" },
+      "type": { "id": 1, "value": "Bug Bounty" },
+      "webLinks": { "detail": "https://app.intigriti.com/auth/dashboard?redirect=/programs/anonymized-handle-1/anonymized-handle-1/detail" },
+      "industry": "Anonymized Industry"
+    },
+    {
+      "id": "00000000-0000-4000-8000-000000000002",
+      "handle": "anonymized-handle-2",
+      "name": "Anonymized Company - Responsible Disclosure",
+      "following": true,
+      "minBounty": { "value": 0, "currency": "EUR" },
+      "maxBounty": { "value": 0, "currency": "EUR" },
+      "confidentialityLevel": { "id": 4, "value": "Public" },
+      "status": { "id": 3, "value": "Open" },
+      "type": { "id": 2, "value": "Vulnerability Disclosure" },
+      "webLinks": { "detail": "https://app.intigriti.com/auth/dashboard?redirect=/programs/anonymized-handle-2/anonymized-handle-2/detail" },
+      "industry": null
+    }
+  ]
+}

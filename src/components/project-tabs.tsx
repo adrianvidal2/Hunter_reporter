@@ -1,14 +1,19 @@
 'use client'
 
 import Link from 'next/link'
+import { useRouter } from 'next/navigation'
 import { useMemo, useState, useTransition } from 'react'
 import { deleteFileAction, moveFileAction } from '@/app/actions'
 import type { ProjectListing } from '@/core/fs/tree'
 import type { Program } from '@/core/ywh/types'
 import type { PromptMeta } from '@/core/prompts/prompts'
+import type { ScanRow } from '@/server/scans'
+import { ScansTable } from './scans-table'
 import { filterFiles, sortFiles, type SortBy, type SortDir } from '@/core/fs/sorting'
 import { defaultProjectTab, PROJECT_TAB_ORDER, type ProjectTab } from '@/core/project-tabs'
 import { ProjectProgramTab } from './project-program-tab'
+import { DeliverUploadZone } from './deliver-upload-zone'
+import { ReconPanel } from './recon-panel'
 
 /** Formatea bytes a la unidad más legible. */
 function formatBytes(bytes: number): string {
@@ -40,6 +45,7 @@ export function ProjectTabs({
   projects,
   program = null,
   prompts = [],
+  scans = [],
 }: {
   listing: ProjectListing
   /** Todos los proyectos (para el menú "Mover a…" del 3.5). */
@@ -48,6 +54,8 @@ export function ProjectTabs({
   program?: Program | null
   /** Prompts globales para el wizard Lanzar (paso 2). */
   prompts?: PromptMeta[]
+  /** Escaneos de ESTE proyecto (una fila por agente), estado en vivo. */
+  scans?: ScanRow[]
 }) {
   const [tab, setTab] = useState<Tab>(defaultProjectTab())
   const [query, setQuery] = useState('')
@@ -56,6 +64,7 @@ export function ProjectTabs({
   const [menuFor, setMenuFor] = useState<string | null>(null)
   const [actionError, setActionError] = useState<string | null>(null)
   const [pending, startTransition] = useTransition()
+  const router = useRouter()
 
   const base = tab === 'entregados' ? listing.delivered : listing.drafts
   const files = useMemo(
@@ -112,11 +121,15 @@ export function ProjectTabs({
             programa: program != null ? 1 : 0,
             entregados: listing.delivered.length,
             borradores: listing.drafts.length,
+            escaneos: scans.length,
+            recon: 0, // los runs se listan dentro de la propia pestaña
           }
           const labels: Record<Tab, string> = {
             programa: 'Programa',
             entregados: 'Entregados',
             borradores: 'Borradores',
+            escaneos: 'Escaneos',
+            recon: 'Recon',
           }
           return tabButton(value, labels[value], counts[value])
         })}
@@ -126,6 +139,12 @@ export function ProjectTabs({
         <div className="mt-6">
           <ProjectProgramTab program={program} project={listing.project} prompts={prompts} />
         </div>
+      ) : tab === 'escaneos' ? (
+        <div className="mt-6">
+          <ScansTable initial={scans} project={listing.project} />
+        </div>
+      ) : tab === 'recon' ? (
+        <ReconPanel project={listing.project} />
       ) : (
         <>
         <div className="mt-4 flex flex-wrap items-center gap-2">
@@ -172,6 +191,11 @@ export function ProjectTabs({
       ) : null}
       {pending ? (
         <p className="mt-3 text-sm text-zinc-500 dark:text-zinc-400">Trabajando…</p>
+      ) : null}
+
+      {/* Subida de PDFs entregados (solo en la pestaña Entregados) */}
+      {tab === 'entregados' ? (
+        <DeliverUploadZone project={listing.project} onUploaded={() => router.refresh()} />
       ) : null}
 
       {files.length === 0 ? (

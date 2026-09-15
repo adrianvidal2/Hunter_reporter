@@ -1,0 +1,56 @@
+{
+  "id": "00000000-0000-4000-8000-000000000001",
+  "handle": "anonymized-handle-1",
+  "name": "Anonymized Company - Bug Bounty",
+  "following": false,
+  "confidentialityLevel": { "id": 4, "value": "Public" },
+  "status": { "id": 3, "value": "Open" },
+  "type": { "id": 1, "value": "Bug Bounty" },
+  "domains": {
+    "id": "00000000-0000-4000-8000-00000000000a",
+    "createdAt": 1768926610,
+    "content": [
+      {
+        "id": "00000000-0000-4000-8000-0000000000b1",
+        "type": { "id": 7, "value": "Wildcard" },
+        "endpoint": "*.example-anonymized.com",
+        "tier": { "id": 3, "value": "Critical" },
+        "description": "Any subdomain of example-anonymized.com (primary application).",
+        "requiredSkills": []
+      },
+      {
+        "id": "00000000-0000-4000-8000-0000000000b2",
+        "type": { "id": 1, "value": "Url" },
+        "endpoint": "https://api.example-anonymized.com",
+        "tier": { "id": 2, "value": "High" },
+        "description": "Public API endpoint.",
+        "requiredSkills": []
+      },
+      {
+        "id": "00000000-0000-4000-8000-0000000000b3",
+        "type": { "id": 7, "value": "Wildcard" },
+        "endpoint": "*.legacy.example-anonymized.com",
+        "tier": { "id": 1, "value": "No Bounty" },
+        "description": "Legacy infrastructure. In scope for reports, no bounty.",
+        "requiredSkills": []
+      }
+    ]
+  },
+  "rulesOfEngagement": {
+    "id": "00000000-0000-4000-8000-00000000000c",
+    "attachments": [],
+    "createdAt": 1768926610,
+    "content": {
+      "description": "\n#### By participating in this anonymized program, you agree to:\n\n* Respect the researcher code of conduct\n* Do not run automated scanners without permission\n\n#### Scope notes\n\n* Out of scope: anything not listed in the domains above.\n",
+      "testingRequirements": {
+        "intigritiMe": false,
+        "automatedTooling": 1,
+        "userAgent": "AnonymizedProgram-UA-Required",
+        "requestHeader": "X-Anonymized-Username: {Username}"
+      },
+      "safeHarbour": true
+    }
+  },
+  "webLinks": { "detail": "https://app.intigriti.com/auth/dashboard?redirect=/programs/anonymized-handle-1/anonymized-handle-1/detail" },
+  "industry": "Anonymized Industry"
+}

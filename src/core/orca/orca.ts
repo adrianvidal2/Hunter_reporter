@@ -244,3 +244,124 @@ export function parseOrcaRepoAdd(stdout: string): OrcaRepoAdd {
 function asStr(v: unknown): string | undefined {
   return typeof v === 'string' && v !== '' ? v : undefined
 }
+
+// ── terminal list (estado en vivo de las sesiones) ──────────────────────
+
+export interface OrcaTerminal {
+  handle?: string
+  id?: string
+  connected?: boolean
+  orphaned?: boolean
+  /** timestamp (ms o ISO) de la última salida del terminal. */
+  lastOutputAt?: number | string
+  title?: string
+  agent?: string
+  state?: string
+}
+
+export interface OrcaTerminalList {
+  ok: boolean
+  terminals: OrcaTerminal[]
+  message?: string
+}
+
+/** Parsea `orca terminal list --json` → lista de terminales. Tolerante a
+ *  `result.terminals`, `terminals` o el propio bloque como array. */
+export function parseOrcaTerminalList(stdout: string): OrcaTerminalList {
+  const block = extractJsonBlock(stdout)
+  if (!block) return { ok: false, terminals: [] }
+
+  if (Array.isArray(block)) {
+    return { ok: true, terminals: block.map(normalizeTerminal) }
+  }
+  const b = block as Record<string, unknown>
+  const result = (b.result ?? {}) as Record<string, unknown>
+  const candidates: unknown[] = [result.terminals, b.terminals, result.terminalList, b.terminalList]
+  const arr = candidates.find(Array.isArray)
+  if (!arr) return { ok: b.ok !== false, terminals: [] }
+  return { ok: b.ok !== false, terminals: arr.map(normalizeTerminal) }
+}
+
+function normalizeTerminal(t: unknown): OrcaTerminal {
+  if (!t || typeof t !== 'object') return {}
+  const r = t as Record<string, unknown>
+  return {
+    handle: asStr(r.handle) ?? asStr(r.id),
+    id: asStr(r.id) ?? asStr(r.handle),
+    connected: typeof r.connected === 'boolean' ? r.connected : undefined,
+    orphaned: typeof r.orphaned === 'boolean' ? r.orphaned : undefined,
+    lastOutputAt: typeof r.lastOutputAt === 'number' || typeof r.lastOutputAt === 'string' ? r.lastOutputAt : undefined,
+    title: asStr(r.title),
+    agent: asStr(r.agent),
+    state: asStr(r.state),
+  }
+}
+
+// ── Estado derivado del terminal (efímero, nunca cacheado) ──────────────
+
+/** Estado del terminal derivado AQUÍ Y AHORA (solo cierto al preguntar). */
+export type OrcaTerminalStatus = 'closed' | 'dead' | 'active' | 'idle' | 'unknown'
+
+export interface OrcaTerminalStatusInfo {
+  status: OrcaTerminalStatus
+  /** Etiqueta legible para la UI. */
+  label: string
+  /** ms desde lastOutputAt (null si no hay info de actividad). */
+  lastActivityAgoMs: number | null
+}
+
+/** Umbral de "actividad reciente" (ms): dentro → Activa, fuera → Ociosa. */
+export const ORCA_ACTIVITY_WINDOW_MS = 60_000
+
+/** Interpreta un timestamp como ms epoch (acepta ISO string). */
+export function toEpochMs(v: number | string | null | undefined): number | null {
+  if (v == null) return null
+  const n = typeof v === 'number' ? v : Date.parse(v)
+  return Number.isFinite(n) ? n : null
+}
+
+/**
+ * Deriva el estado del terminal:
+ * - handle ausente en la lista → 'closed' (Sesión cerrada) — NO error.
+ * - connected:false u orphaned:true → 'dead' (Muerta / desconectada).
+ * - connected:true y lastOutputAt < ~60s → 'active' (Activa).
+ * - connected:true y lastOutputAt antiguo → 'idle' (Ociosa).
+ */
+export function deriveTerminalStatus(
+  terminal: OrcaTerminal | undefined,
+  nowMs: number = Date.now(),
+): OrcaTerminalStatusInfo {
+  if (!terminal) {
+    return { status: 'closed', label: 'Sesión cerrada', lastActivityAgoMs: null }
+  }
+  const connected = terminal.connected !== false
+  const orphaned = terminal.orphaned === true
+  if (!connected || orphaned) {
+    return { status: 'dead', label: 'Muerta / desconectada', lastActivityAgoMs: lastAgoMs(terminal.lastOutputAt, nowMs) }
+  }
+  const lastEpoch = toEpochMs(terminal.lastOutputAt)
+  if (lastEpoch == null) {
+    return { status: 'idle', label: 'Ociosa', lastActivityAgoMs: null }
+  }
+  const ago = Math.max(0, nowMs - lastEpoch)
+  if (ago < ORCA_ACTIVITY_WINDOW_MS) {
+    return { status: 'active', label: 'Activa', lastActivityAgoMs: ago }
+  }
+  return { status: 'idle', label: 'Ociosa', lastActivityAgoMs: ago }
+}
+
+function lastAgoMs(lastOutputAt: number | string | undefined, now: number): number | null {
+  const e = toEpochMs(lastOutputAt)
+  return e == null ? null : Math.max(0, now - e)
+}
+
+/** Formatea "hace X" de un lapso en ms. */
+export function fmtLastActivity(agoMs: number | null): string {
+  if (agoMs == null) return '—'
+  const s = Math.floor(agoMs / 1000)
+  if (s < 60) return `hace ${s}s`
+  const m = Math.floor(s / 60)
+  if (m < 60) return `hace ${m} min`
+  const h = Math.floor(m / 60)
+  return `hace ${h} h`
+}

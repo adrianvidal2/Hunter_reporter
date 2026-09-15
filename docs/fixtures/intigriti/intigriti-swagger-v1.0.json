@@ -1,0 +1,891 @@
+{
+  "x-generator": "NSwag v14.7.1.0 (NJsonSchema v11.6.1.0 (Newtonsoft.Json v13.0.0.0))",
+  "openapi": "3.0.0",
+  "info": {
+    "title": "Intigriti researcher API v1.0",
+    "version": "1.0"
+  },
+  "servers": [
+    {
+      "url": "https://api.intigriti.com/external/researcher"
+    }
+  ],
+  "paths": {
+    "/v1/payouts": {
+      "get": {
+        "tags": [
+          "Payout"
+        ],
+        "summary": "BETA: Get all payouts you have access to",
+        "operationId": "Payout_GetPayoutOverview",
+        "parameters": [
+          {
+            "name": "statusId",
+            "in": "query",
+            "schema": {
+              "type": "integer",
+              "format": "int32",
+              "nullable": true
+            },
+            "x-position": 1
+          },
+          {
+            "name": "createdSince",
+            "in": "query",
+            "schema": {
+              "type": "integer",
+              "format": "int64",
+              "nullable": true
+            },
+            "x-position": 2
+          },
+          {
+            "name": "paidSince",
+            "in": "query",
+            "schema": {
+              "type": "integer",
+              "format": "int64",
+              "nullable": true
+            },
+            "x-position": 3
+          },
+          {
+            "name": "limit",
+            "in": "query",
+            "schema": {
+              "type": "integer",
+              "format": "int32",
+              "maximum": 500.0,
+              "minimum": 0.0
+            },
+            "x-position": 4
+          },
+          {
+            "name": "offset",
+            "in": "query",
+            "schema": {
+              "type": "integer",
+              "format": "int32",
+              "maximum": 2147483647.0,
+              "minimum": 0.0
+            },
+            "x-position": 5
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Returns all payouts that are available to the researcher.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PaginationViewModelOfPayoutOverviewViewModel"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ]
+      }
+    },
+    "/v1/programs": {
+      "get": {
+        "tags": [
+          "Program"
+        ],
+        "summary": "Get all programs you have access to",
+        "operationId": "Program_GetProgramOverview",
+        "parameters": [
+          {
+            "name": "statusId",
+            "in": "query",
+            "schema": {
+              "type": "integer",
+              "format": "int32",
+              "nullable": true
+            },
+            "x-position": 1
+          },
+          {
+            "name": "typeId",
+            "in": "query",
+            "schema": {
+              "type": "integer",
+              "format": "int32",
+              "nullable": true
+            },
+            "x-position": 2
+          },
+          {
+            "name": "following",
+            "in": "query",
+            "schema": {
+              "type": "boolean",
+              "nullable": true
+            },
+            "x-position": 3
+          },
+          {
+            "name": "limit",
+            "in": "query",
+            "schema": {
+              "type": "integer",
+              "format": "int32",
+              "maximum": 500.0,
+              "minimum": 0.0
+            },
+            "x-position": 4
+          },
+          {
+            "name": "offset",
+            "in": "query",
+            "schema": {
+              "type": "integer",
+              "format": "int32",
+              "maximum": 2147483647.0,
+              "minimum": 0.0
+            },
+            "x-position": 5
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Returns all programs that are available to the researcher.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PaginationViewModelOfProgramOverviewViewModel"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ]
+      }
+    },
+    "/v1/programs/{programId}": {
+      "get": {
+        "tags": [
+          "Program"
+        ],
+        "summary": "Get program details",
+        "operationId": "Program_GetProgramDetail",
+        "parameters": [
+          {
+            "name": "programId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "guid"
+            },
+            "x-position": 1
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Returns the details of a program.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProgramDetailViewModel"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ]
+      }
+    },
+    "/v1/programs/activities": {
+      "get": {
+        "tags": [
+          "Program"
+        ],
+        "summary": "Get all program activities",
+        "operationId": "Program_GetProgramActivities",
+        "parameters": [
+          {
+            "name": "createdSince",
+            "in": "query",
+            "schema": {
+              "type": "integer",
+              "format": "int64",
+              "nullable": true
+            },
+            "x-position": 1
+          },
+          {
+            "name": "following",
+            "in": "query",
+            "schema": {
+              "type": "boolean",
+              "nullable": true
+            },
+            "x-position": 2
+          },
+          {
+            "name": "limit",
+            "in": "query",
+            "schema": {
+              "type": "integer",
+              "format": "int32",
+              "maximum": 500.0,
+              "minimum": 0.0
+            },
+            "x-position": 3
+          },
+          {
+            "name": "offset",
+            "in": "query",
+            "schema": {
+              "type": "integer",
+              "format": "int32",
+              "maximum": 2147483647.0,
+              "minimum": 0.0
+            },
+            "x-position": 4
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Returns the 50 most recent activities.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PaginationViewModelOfProgramActivityViewModel"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ]
+      }
+    },
+    "/v1/programs/{programId}/domains/{versionId}": {
+      "get": {
+        "tags": [
+          "Program"
+        ],
+        "summary": "Get program domains",
+        "operationId": "Program_GetProgramAsset",
+        "parameters": [
+          {
+            "name": "programId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "guid"
+            },
+            "x-position": 1
+          },
+          {
+            "name": "versionId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "guid"
+            },
+            "x-position": 2
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Returns a version of the domains of a given program.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProgramDomainsViewModel"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ]
+      }
+    },
+    "/v1/programs/{programId}/rules-of-engagements/{versionId}": {
+      "get": {
+        "tags": [
+          "Program"
+        ],
+        "summary": "Get program rules of engagement",
+        "operationId": "Program_GetProgramRulesOfEngagement",
+        "parameters": [
+          {
+            "name": "programId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "guid"
+            },
+            "x-position": 1
+          },
+          {
+            "name": "versionId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "guid"
+            },
+            "x-position": 2
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Returns a version of the rules of engagement of a given program.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProgramRulesOfEngagementViewModel"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ]
+      }
+    }
+  },
+  "components": {
+    "schemas": {
+      "PaginationViewModelOfPayoutOverviewViewModel": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "maxCount",
+          "records"
+        ],
+        "properties": {
+          "maxCount": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "records": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/PayoutOverviewViewModel"
+            }
+          }
+        }
+      },
+      "PayoutOverviewViewModel": {
+        "type": "object",
+        "x-abstract": true,
+        "additionalProperties": false,
+        "required": [
+          "id",
+          "amount",
+          "status",
+          "createdAt",
+          "paidAt"
+        ],
+        "properties": {
+          "id": {
+            "type": "string"
+          },
+          "amount": {
+            "$ref": "#/components/schemas/MoneyViewModel"
+          },
+          "status": {
+            "$ref": "#/components/schemas/EnumerationViewModel"
+          },
+          "createdAt": {
+            "type": "integer",
+            "format": "int64"
+          },
+          "paidAt": {
+            "type": "integer",
+            "format": "int64",
+            "nullable": true
+          }
+        }
+      },
+      "MoneyViewModel": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "value",
+          "currency"
+        ],
+        "properties": {
+          "value": {
+            "type": "number",
+            "format": "decimal"
+          },
+          "currency": {
+            "type": "string"
+          }
+        }
+      },
+      "EnumerationViewModel": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "id",
+          "value"
+        ],
+        "properties": {
+          "id": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "value": {
+            "type": "string"
+          }
+        }
+      },
+      "PaginationViewModelOfProgramOverviewViewModel": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "maxCount",
+          "records"
+        ],
+        "properties": {
+          "maxCount": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "records": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/ProgramOverviewViewModel"
+            }
+          }
+        }
+      },
+      "ProgramOverviewViewModel": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "id",
+          "handle",
+          "name",
+          "following",
+          "minBounty",
+          "maxBounty",
+          "confidentialityLevel",
+          "status",
+          "type",
+          "webLinks",
+          "industry"
+        ],
+        "properties": {
+          "id": {
+            "type": "string",
+            "format": "guid"
+          },
+          "handle": {
+            "type": "string"
+          },
+          "name": {
+            "type": "string"
+          },
+          "following": {
+            "type": "boolean"
+          },
+          "minBounty": {
+            "$ref": "#/components/schemas/MoneyViewModel"
+          },
+          "maxBounty": {
+            "$ref": "#/components/schemas/MoneyViewModel"
+          },
+          "confidentialityLevel": {
+            "$ref": "#/components/schemas/EnumerationViewModel"
+          },
+          "status": {
+            "$ref": "#/components/schemas/EnumerationViewModel"
+          },
+          "type": {
+            "$ref": "#/components/schemas/EnumerationViewModel"
+          },
+          "webLinks": {
+            "$ref": "#/components/schemas/ProgramWebLinks"
+          },
+          "industry": {
+            "type": "string",
+            "nullable": true
+          }
+        }
+      },
+      "ProgramWebLinks": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "detail"
+        ],
+        "properties": {
+          "detail": {
+            "type": "string"
+          }
+        }
+      },
+      "ProgramDetailViewModel": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "id",
+          "handle",
+          "name",
+          "following",
+          "confidentialityLevel",
+          "status",
+          "type",
+          "domains",
+          "rulesOfEngagement",
+          "webLinks",
+          "industry"
+        ],
+        "properties": {
+          "id": {
+            "type": "string",
+            "format": "guid"
+          },
+          "handle": {
+            "type": "string"
+          },
+          "name": {
+            "type": "string"
+          },
+          "following": {
+            "type": "boolean"
+          },
+          "confidentialityLevel": {
+            "$ref": "#/components/schemas/EnumerationViewModel"
+          },
+          "status": {
+            "$ref": "#/components/schemas/EnumerationViewModel"
+          },
+          "type": {
+            "$ref": "#/components/schemas/EnumerationViewModel"
+          },
+          "domains": {
+            "$ref": "#/components/schemas/VersionViewModelOfListOfDomainViewModel"
+          },
+          "rulesOfEngagement": {
+            "nullable": true,
+            "oneOf": [
+              {
+                "$ref": "#/components/schemas/VersionWithAttachmentsViewModelOfRulesOfEngagementViewModel"
+              }
+            ]
+          },
+          "webLinks": {
+            "$ref": "#/components/schemas/ProgramWebLinks"
+          },
+          "industry": {
+            "type": "string",
+            "nullable": true
+          }
+        }
+      },
+      "VersionViewModelOfListOfDomainViewModel": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "id",
+          "createdAt",
+          "content"
+        ],
+        "properties": {
+          "id": {
+            "type": "string",
+            "format": "guid"
+          },
+          "createdAt": {
+            "type": "integer",
+            "format": "int64"
+          },
+          "content": {
+            "type": "array",
+            "nullable": true,
+            "items": {
+              "$ref": "#/components/schemas/DomainViewModel"
+            }
+          }
+        }
+      },
+      "DomainViewModel": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "id",
+          "type",
+          "endpoint",
+          "tier",
+          "description",
+          "requiredSkills"
+        ],
+        "properties": {
+          "id": {
+            "type": "string",
+            "format": "guid"
+          },
+          "type": {
+            "$ref": "#/components/schemas/EnumerationViewModel"
+          },
+          "endpoint": {
+            "type": "string"
+          },
+          "tier": {
+            "$ref": "#/components/schemas/EnumerationViewModel"
+          },
+          "description": {
+            "type": "string"
+          },
+          "requiredSkills": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/SkillViewModel"
+            }
+          }
+        }
+      },
+      "SkillViewModel": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "id",
+          "name"
+        ],
+        "properties": {
+          "id": {
+            "type": "string"
+          },
+          "name": {
+            "type": "string"
+          }
+        }
+      },
+      "VersionWithAttachmentsViewModelOfRulesOfEngagementViewModel": {
+        "allOf": [
+          {
+            "$ref": "#/components/schemas/VersionViewModelOfRulesOfEngagementViewModel"
+          },
+          {
+            "type": "object",
+            "additionalProperties": false,
+            "required": [
+              "attachments"
+            ],
+            "properties": {
+              "attachments": {
+                "type": "array",
+                "items": {
+                  "$ref": "#/components/schemas/AttachmentViewModel"
+                }
+              }
+            }
+          }
+        ]
+      },
+      "AttachmentViewModel": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "url",
+          "code"
+        ],
+        "properties": {
+          "url": {
+            "type": "string"
+          },
+          "code": {
+            "type": "integer",
+            "format": "int32"
+          }
+        }
+      },
+      "VersionViewModelOfRulesOfEngagementViewModel": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "id",
+          "createdAt",
+          "content"
+        ],
+        "properties": {
+          "id": {
+            "type": "string",
+            "format": "guid"
+          },
+          "createdAt": {
+            "type": "integer",
+            "format": "int64"
+          },
+          "content": {
+            "nullable": true,
+            "oneOf": [
+              {
+                "$ref": "#/components/schemas/RulesOfEngagementViewModel"
+              }
+            ]
+          }
+        }
+      },
+      "RulesOfEngagementViewModel": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "description",
+          "testingRequirements",
+          "safeHarbour"
+        ],
+        "properties": {
+          "description": {
+            "type": "string"
+          },
+          "testingRequirements": {
+            "$ref": "#/components/schemas/TestingRequirementsViewModel"
+          },
+          "safeHarbour": {
+            "type": "boolean"
+          }
+        }
+      },
+      "TestingRequirementsViewModel": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "intigritiMe",
+          "automatedTooling",
+          "userAgent",
+          "requestHeader"
+        ],
+        "properties": {
+          "intigritiMe": {
+            "type": "boolean"
+          },
+          "automatedTooling": {
+            "type": "integer",
+            "format": "int32",
+            "nullable": true
+          },
+          "userAgent": {
+            "type": "string",
+            "nullable": true
+          },
+          "requestHeader": {
+            "type": "string",
+            "nullable": true
+          }
+        }
+      },
+      "PaginationViewModelOfProgramActivityViewModel": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "maxCount",
+          "records"
+        ],
+        "properties": {
+          "maxCount": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "records": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/ProgramActivityViewModel"
+            }
+          }
+        }
+      },
+      "ProgramActivityViewModel": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "programId",
+          "activity",
+          "type",
+          "createdAt",
+          "following"
+        ],
+        "properties": {
+          "programId": {
+            "type": "string",
+            "format": "guid"
+          },
+          "activity": {
+            "$ref": "#/components/schemas/ActivityViewModel"
+          },
+          "type": {
+            "$ref": "#/components/schemas/EnumerationViewModel"
+          },
+          "createdAt": {
+            "type": "integer",
+            "format": "int64"
+          },
+          "following": {
+            "type": "boolean"
+          }
+        }
+      },
+      "ActivityViewModel": {
+        "type": "object",
+        "x-abstract": true,
+        "additionalProperties": false
+      },
+      "ProgramDomainsViewModel": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "domains"
+        ],
+        "properties": {
+          "domains": {
+            "$ref": "#/components/schemas/VersionViewModelOfListOfDomainViewModel"
+          }
+        }
+      },
+      "ProgramRulesOfEngagementViewModel": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "rulesOfEngagement"
+        ],
+        "properties": {
+          "rulesOfEngagement": {
+            "$ref": "#/components/schemas/VersionWithAttachmentsViewModelOfRulesOfEngagementViewModel"
+          }
+        }
+      }
+    },
+    "securitySchemes": {
+      "bearerAuth": {
+        "type": "http",
+        "name": "Authorization",
+        "in": "header",
+        "scheme": "bearer"
+      }
+    }
+  }
+}

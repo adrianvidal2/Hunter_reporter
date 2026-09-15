@@ -112,6 +112,16 @@ describe('4.10 · round-trip sin pérdida (requisito clave)', () => {
     const next = updateMeta(HANDWRITTEN, { title: 'Título: con "comillas" y #hash' })
     expect(next).toContain('title: "Título: con \\"comillas\\" y #hash"')
   })
+
+  it('cvss_vector (calculadora): round-trip getMeta/updateMeta con el vector plano', () => {
+    const vector = 'CVSS:3.1/AV:N/AC:L/PR:N/UI:N/S:U/C:H/I:H/A:H'
+    const next = updateMeta(HANDWRITTEN, { cvss: '9.8', cvss_vector: vector })
+    const meta = getMeta(next)
+    expect(meta.cvss).toBe('9.8')
+    expect(meta.cvss_vector).toBe(vector)
+    // idempotente: reescribir lo mismo no cambia nada
+    expect(updateMeta(next, { cvss_vector: vector })).toBe(next)
+  })
 })
 
 function changedLines(before: string, after: string): [string, string][] {

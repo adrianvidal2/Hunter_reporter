@@ -5,3 +5,8 @@ import { readFileSync } from 'node:fs'
 export function sha256File(absPath: string): string {
   return createHash('sha256').update(readFileSync(absPath)).digest('hex')
 }
+
+/** sha-256 (hex) de un contenido en memoria (sin pasar por disco). */
+export function sha256Content(content: string | Buffer): string {
+  return createHash('sha256').update(content).digest('hex')
+}

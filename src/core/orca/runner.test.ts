@@ -1,5 +1,5 @@
 import { describe, expect, it, vi } from 'vitest'
-import { runOrcaLaunch, type ExecImpl } from './runner'
+import { runOrcaLaunch, createOrcaWorktreeRun, type ExecImpl } from './runner'
 import { classifyOrcaMessage } from './orca'
 
 function makeExec(script: (args: string[]) => Promise<{ stdout: string; stderr?: string; code?: number }>): ExecImpl {
@@ -264,5 +264,50 @@ describe('runOrcaLaunch · registro automático de carpeta (git local)', () => {
     expect(out.ok).toBe(false)
     expect(out.kind).toBe('register')
     expect(out.message).toContain('not a git repo')
+  })
+})
+
+describe('createOrcaWorktreeRun · multi-proveedor (un worktree por proveedor)', () => {
+  it('3 proveedores → 3 worktrees con sus ids de agente mapeados', async () => {
+    const calls: { args: string[] }[] = []
+    const exec: ExecImpl = async (_b, args) => {
+      calls.push({ args })
+      return { stdout: '{"ok":true,"worktree":{"id":"wt-' + args[args.indexOf('--agent') + 1] + '"}}', stderr: '', code: 0 }
+    }
+    const agents = ['pi', 'claude', 'hermes']
+    const results = []
+    for (const agent of agents) {
+      results.push(await createOrcaWorktreeRun(
+        { bin: '/x', repoPath: '/r', worktreeName: `p-${agent}-${Date.now()}`, prompt: 'p', agent },
+        exec,
+      ))
+    }
+    expect(results.every((r) => r.ok)).toBe(true)
+    // ids usados en --agent de cada llamada
+    const used = calls.map((c) => c.args[c.args.indexOf('--agent') + 1])
+    expect(used).toEqual(agents)
+    // worktreeId distinto por llamada (aislamiento)
+    expect(new Set(results.map((r) => r.worktreeId)).size).toBe(3)
+  })
+
+  it('id de agente inválido (Unknown TUI agent) → falla ese, el resto sigue', async () => {
+    const exec: ExecImpl = async (_b, args) => {
+      const agent = args[args.indexOf('--agent') + 1]
+      if (agent === 'zcode') return { stdout: '{"ok":false,"result":{"error":{"message":"Unknown TUI agent: zcode"}}}', stderr: '', code: 0 }
+      return { stdout: '{"ok":true,"worktree":{"id":"wt-' + agent + '"}}', stderr: '', code: 0 }
+    }
+    const results = []
+    for (const agent of ['pi', 'zcode', 'deepseek']) {
+      const r = await createOrcaWorktreeRun(
+        { bin: '/x', repoPath: '/r', worktreeName: `p-${agent}`, prompt: 'p', agent },
+        exec,
+      )
+      results.push({ agent, ...r })
+    }
+    // pi y deepseek ok; zcode no
+    expect(results[0]!.ok).toBe(true)
+    expect(results[1]!.ok).toBe(false)
+    expect(results[1]!.kind).toBe('unknown_agent')
+    expect(results[2]!.ok).toBe(true)
   })
 })

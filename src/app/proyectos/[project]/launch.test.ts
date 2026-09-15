@@ -8,8 +8,24 @@ vi.mock('@/lib/env', () => ({
   getEnv: () => ({ REPORTS_ROOT: env.root }),
 }))
 vi.mock('next/cache', () => ({ revalidatePath: vi.fn() }))
+vi.mock('@/core/orca/settings', () => ({
+  loadOrcaSettings: () => ({ orcaBin: '/tmp/orca' }),
+}))
+const orcaState = vi.hoisted(() => ({
+  agents: [] as string[],
+  createImpl: null as null | ((agent: string) => Promise<{ ok: boolean; kind: string; worktreeId?: string; handle?: string; message?: string }>),
+}))
+vi.mock('@/core/orca/runner', () => ({
+  defaultExec: async () => ({ stdout: '', stderr: '', code: 0 }),
+  prepareOrcaRun: async () => ({ ok: true, startedReachable: true, opened: false, registered: true, kind: 'other' }),
+  createOrcaWorktreeRun: async (input: { agent: string }) => {
+    orcaState.agents.push(input.agent)
+    if (orcaState.createImpl) return orcaState.createImpl(input.agent)
+    return { ok: true, kind: 'other', worktreeId: `wt-${input.agent}`, handle: `h-${input.agent}` }
+  },
+}))
 
-import { launchProgramAction } from './launch'
+import { launchOrcaAction, launchProgramAction } from './launch'
 
 /** Escribe un programa.json realista en el proyecto del fixture. */
 function writeProgramJson(fx: Fixture, accountAccess?: string | null) {
@@ -136,5 +152,84 @@ describe('launchProgramAction (pestaña Programa → pentest/info.md)', () => {
     })
     expect(res.ok).toBe(false)
     if (!res.ok) expect(res.error).toContain('Sin datos')
+  })
+})
+
+describe('launchOrcaAction · lote de agtentes', () => {
+  beforeEach(() => {
+    orcaState.agents = []
+    orcaState.createImpl = null
+  })
+
+  it('2 pi + 1 hermes → 3 worktrees con SU prompt y una entrada por agente en launches.json', async () => {
+    const fx = createFixture()
+    env.root = fx.root
+    writeProgramJson(fx)
+
+    const res = await launchOrcaAction({
+      project: 'demo_project',
+      selectedScopes: ['https://a.test'],
+      mode: 'orca',
+      agents: [
+        { provider: 'pi', prompt: 'prompt A', label: 'Pi #1' },
+        { provider: 'pi', prompt: 'prompt B', label: 'Pi #2' },
+        { provider: 'hermes', prompt: 'prompt C', label: 'Hermes #1' },
+      ],
+    })
+
+    expect(res.ok).toBe(true)
+    if (res.ok) {
+      expect(res.providers).toHaveLength(3)
+      expect(res.providers.every((p) => p.ok)).toBe(true)
+      expect(res.providers.map((p) => p.label)).toEqual(['Pi #1', 'Pi #2', 'Hermes #1'])
+      expect(res.providers.map((p) => p.worktreeId)).toEqual(['wt-pi', 'wt-pi', 'wt-hermes'])
+    }
+    expect([...orcaState.agents].sort()).toEqual(['hermes', 'pi', 'pi']) // dos pi = dos worktrees
+
+    const launches = JSON.parse(readFileSync(path.join(fx.root, 'demo_project/pentest/launches.json'), 'utf8'))
+    expect(launches.launches).toHaveLength(3)
+    // una entrada por agente, con su label y su prompt ENTERO
+    const byLabel = Object.fromEntries(launches.launches.map((l: Record<string, string>) => [l.label, l.prompt]))
+    expect(byLabel['Pi #1']).toBe('prompt A')
+    expect(byLabel['Pi #2']).toBe('prompt B')
+    expect(byLabel['Hermes #1']).toBe('prompt C')
+    expect(launches.launches.every((l: { ok: boolean }) => l.ok)).toBe(true)
+    fx.cleanup()
+  })
+
+  it('un agente con id inválido NO aborta el resto; su entrada marca el error', async () => {
+    const fx = createFixture()
+    env.root = fx.root
+    writeProgramJson(fx)
+    // Kimi falla con unknown_agent; pi y deepseek ok
+    orcaState.createImpl = async (agent) => {
+      if (agent === 'kimi') return { ok: false, kind: 'unknown_agent', message: 'Unknown TUI agent' }
+      return { ok: true, kind: 'other', worktreeId: `wt-${agent}`, handle: `h-${agent}` }
+    }
+
+    const res = await launchOrcaAction({
+      project: 'demo_project',
+      selectedScopes: [],
+      mode: 'orca',
+      agents: [
+        { provider: 'pi', prompt: 'p1', label: 'Pi #1' },
+        { provider: 'kimi', prompt: 'p2', label: 'Kimi #1' },
+        { provider: 'deepseek', prompt: 'p3', label: 'Deepseek #1' },
+      ],
+    })
+
+    expect(res.ok).toBe(true)
+    if (res.ok) {
+      const kimi = res.providers.find((p) => p.label === 'Kimi #1')
+      expect(kimi?.ok).toBe(false)
+      expect(kimi?.kind).toBe('unknown_agent')
+      expect(kimi?.error).toMatch(/id de agente no válido en Orca/)
+      expect(res.providers.filter((p) => p.ok)).toHaveLength(2) // pi y deepseek
+    }
+    const launches = JSON.parse(readFileSync(path.join(fx.root, 'demo_project/pentest/launches.json'), 'utf8'))
+    expect(launches.launches).toHaveLength(3)
+    expect(launches.launches.filter((l: { ok: boolean }) => !l.ok)).toHaveLength(1)
+    expect(launches.launches.filter((l: { ok: boolean }) => !l.ok)[0]!.error).toMatch(/id de agente no válido/i)
+    fx.cleanup()
   })
 })

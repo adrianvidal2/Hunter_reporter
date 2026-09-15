@@ -1,12 +1,15 @@
 import { describe, expect, it } from 'vitest'
 import {
   classifyOrcaMessage,
+  deriveTerminalStatus,
   errorText,
   extractJsonBlock,
+  fmtLastActivity,
   isRepoRegistered,
   parseOrcaRepoAdd,
   parseOrcaRepoList,
   parseOrcaStatus,
+  parseOrcaTerminalList,
   parseOrcaWorktree,
 } from './orca'
 
@@ -176,5 +179,57 @@ describe('parseOrcaRepoList / isRepoRegistered / parseOrcaRepoAdd', () => {
   it('repo add extrae id/repoId', () => {
     const out = '{"ok":true,"result":{"repo":{"id":"repo-42"}}}'
     expect(parseOrcaRepoAdd(out).id).toBe('repo-42')
+  })
+})
+
+describe('parseOrcaTerminalList / deriveTerminalStatus (pestaña Escaneos)', () => {
+  const now = 1_780_000_000_000
+
+  it('parsea terminal list entre ruido de logs', () => {
+    const out = '[info] conexión ok\n{"ok":true,"result":{"terminals":[{"handle":"at-1","connected":true,"orphaned":false,"lastOutputAt":' + (now - 10_000) + ',"title":"Pi ready"}]}}\n[info] fin'
+    const list = parseOrcaTerminalList(out)
+    expect(list.ok).toBe(true)
+    expect(list.terminals).toHaveLength(1)
+    expect(list.terminals[0]!.handle).toBe('at-1')
+    expect(list.terminals[0]!.lastOutputAt).toBe(now - 10_000)
+  })
+
+  it('handle presente + lastOutputAt reciente → Activa', () => {
+    const t = { handle: 'at-1', connected: true, orphaned: false, lastOutputAt: now - 5_000 }
+    const s = deriveTerminalStatus(t, now)
+    expect(s.status).toBe('active')
+    expect(s.label).toBe('Activa')
+  })
+
+  it('handle AUSENTE en la lista → Sesión cerrada (no error)', () => {
+    const s = deriveTerminalStatus(undefined, now)
+    expect(s.status).toBe('closed')
+    expect(s.label).toBe('Sesión cerrada')
+  })
+
+  it('orphaned:true → Muerta / desconectada', () => {
+    const t = { handle: 'at-2', connected: true, orphaned: true, lastOutputAt: now }
+    const s = deriveTerminalStatus(t, now)
+    expect(s.status).toBe('dead')
+    expect(s.label).toBe('Muerta / desconectada')
+  })
+
+  it('connected:false → Muerta / desconectada', () => {
+    const t = { handle: 'at-3', connected: false, orphaned: false, lastOutputAt: now }
+    expect(deriveTerminalStatus(t, now).status).toBe('dead')
+  })
+
+  it('connected:true y lastOutputAt antiguo (>60s) → Ociosa', () => {
+    const t = { handle: 'at-4', connected: true, orphaned: false, lastOutputAt: now - 300_000 }
+    const s = deriveTerminalStatus(t, now)
+    expect(s.status).toBe('idle')
+    expect(s.label).toBe('Ociosa')
+    expect(s.lastActivityAgoMs).toBe(300_000)
+  })
+
+  it('fmtLastActivity', () => {
+    expect(fmtLastActivity(null)).toBe('—')
+    expect(fmtLastActivity(5_000)).toBe('hace 5s')
+    expect(fmtLastActivity(120_000)).toBe('hace 2 min')
   })
 })

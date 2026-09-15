@@ -1,8 +1,9 @@
 'use client'
 
+import { useRouter } from 'next/navigation'
 import { useState } from 'react'
+import { syncProjectProgramAction, refreshProjectProgramAction } from '@/app/programas/actions'
 import { CopyButton } from './copy-button'
-import { scopesToText } from './program-detail'
 import { LaunchWizard } from './launch-wizard'
 import { currencySymbol, rewardRows, type CvssLevel } from '@/core/ywh/reward'
 import type { PromptMeta } from '@/core/prompts/prompts'
@@ -29,6 +30,11 @@ const CVSS_BADGE: Record<CvssLevel, string> = {
   Critical: 'border-red-300 text-red-600 dark:border-red-800 dark:text-red-400',
 }
 
+/** Scopes YWH (modelo específico, programa.json local) uno por línea. */
+function scopesToTextYwh(scopes: Program['scopes']): string {
+  return scopes.map((s) => s.scope).filter(Boolean).join('\n')
+}
+
 export function ProjectProgramTab({
   program,
   project,
@@ -39,12 +45,67 @@ export function ProjectProgramTab({
   prompts?: PromptMeta[]
 }) {
   const [wizardOpen, setWizardOpen] = useState(false)
+  const [syncing, setSyncing] = useState(false)
+  const [syncNote, setSyncNote] = useState<string | null>(null)
+  const [refreshing, setRefreshing] = useState(false)
+  const [refreshNote, setRefreshNote] = useState<{ ok: boolean; msg: string } | null>(null)
+  const router = useRouter()
+
+  const sync = async () => {
+    setSyncing(true)
+    setSyncNote(null)
+    const res = await syncProjectProgramAction(project)
+    setSyncing(false)
+    if (res.ok) {
+      setSyncNote('✓ programa.json rellenado con el detalle de la API.')
+      router.refresh()
+    } else if (res.pendingSync) {
+      setSyncNote(`⚠ ${res.syncError ?? 'Sesión caducada'}`)
+    } else {
+      setSyncNote(`✗ ${res.error ?? 'Error al sincronizar'}`)
+    }
+  }
+
+  /** «Actualizar datos del programa»: re-pide el detalle según .config/platform.json. */
+  const refreshProgram = async () => {
+    setRefreshing(true)
+    setRefreshNote(null)
+    const res = await refreshProjectProgramAction(project)
+    setRefreshing(false)
+    if (res.ok) {
+      setRefreshNote({
+        ok: true,
+        msg: res.archivedExisting
+          ? '✓ Datos actualizados: el nuevo programa.md fue a programa-<fecha>.md (el tuyo se conserva).'
+          : `✓ Datos actualizados desde ${res.platform === 'intigriti' ? 'Intigriti' : 'YesWeHack'}.`,
+      })
+      router.refresh()
+    } else if (res.pendingSync) {
+      setRefreshNote({ ok: false, msg: `⚠ ${res.syncError ?? 'Token caducado'}` })
+    } else {
+      setRefreshNote({ ok: false, msg: `✗ ${res.error ?? 'Error al actualizar'}` })
+    }
+  }
 
   if (!program) {
     return (
-      <p className="mt-2 text-sm text-zinc-500 dark:text-zinc-400">
-        Sin datos del programa.
-      </p>
+      <div className="mt-2 space-y-3">
+        <p className="text-sm text-zinc-500 dark:text-zinc-400">
+          Sin datos del programa.
+        </p>
+        <div className="flex items-center gap-2">
+          <button
+            type="button"
+            onClick={() => void sync()}
+            disabled={syncing}
+            className="rounded-md bg-zinc-900 px-4 py-1.5 text-sm font-medium text-zinc-50 hover:bg-zinc-700 disabled:opacity-40 dark:bg-zinc-100 dark:text-zinc-900 dark:hover:bg-zinc-300"
+          >
+            {syncing ? 'Sincronizando…' : 'Sincronizar'}
+          </button>
+          <span className="text-xs text-zinc-400">Rellena pentest/programa.json desde la API del programa.</span>
+        </div>
+        {syncNote ? <p role="status" className="text-sm text-zinc-600 dark:text-zinc-300">{syncNote}</p> : null}
+      </div>
     )
   }
 
@@ -58,14 +119,32 @@ export function ProjectProgramTab({
             {program.business_unit?.name ? ` · ${program.business_unit.name}` : ''}
           </p>
         </div>
-        <button
-          type="button"
-          onClick={() => setWizardOpen(true)}
-          className="rounded-md bg-zinc-900 px-4 py-1.5 text-sm font-medium text-zinc-50 hover:bg-zinc-700 dark:bg-zinc-100 dark:text-zinc-900 dark:hover:bg-zinc-300"
-        >
-          Lanzar
-        </button>
+        <div className="flex items-center gap-2">
+          <button
+            type="button"
+            onClick={() => void refreshProgram()}
+            disabled={refreshing}
+            className="rounded-md border border-zinc-300 px-4 py-1.5 text-sm font-medium hover:bg-zinc-50 disabled:opacity-40 dark:border-zinc-700 dark:hover:bg-zinc-900"
+          >
+            {refreshing ? 'Actualizando…' : 'Actualizar datos del programa'}
+          </button>
+          <button
+            type="button"
+            onClick={() => setWizardOpen(true)}
+            className="rounded-md bg-zinc-900 px-4 py-1.5 text-sm font-medium text-zinc-50 hover:bg-zinc-700 dark:bg-zinc-100 dark:text-zinc-900 dark:hover:bg-zinc-300"
+          >
+            Lanzar
+          </button>
+        </div>
       </div>
+      {refreshNote ? (
+        <p
+          role={refreshNote.ok ? 'status' : 'alert'}
+          className={`text-xs ${refreshNote.ok ? 'text-emerald-600 dark:text-emerald-400' : 'text-red-600 dark:text-red-400'}`}
+        >
+          {refreshNote.msg}
+        </p>
+      ) : null}
 
       {wizardOpen ? (
         <LaunchWizard
@@ -96,7 +175,7 @@ export function ProjectProgramTab({
             Scope in <span className="text-zinc-400">({program.scopes.length})</span>
           </h3>
           {program.scopes.length > 0 ? (
-            <CopyButton text={scopesToText(program.scopes)} label="Copiar scope" title="Copia todos los scopes (uno por línea)" />
+            <CopyButton text={scopesToTextYwh(program.scopes)} label="Copiar scope" title="Copia todos los scopes (uno por línea)" />
           ) : null}
         </div>
         {program.scopes.length === 0 ? (

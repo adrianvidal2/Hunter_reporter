@@ -3,7 +3,27 @@ import { mkdtempSync, rmSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import type { PromptMeta } from '@/core/prompts/prompts'
-import { buildLaunchDraft, DEFAULT_LAUNCH_MODE, ENGINES, LAUNCH_MODES, promptContentFor, promptIsEmpty, savedAsName, toggleProvider, validateLaunch, type LaunchMode } from './launch-form'
+import {
+  agentsFromCounts,
+  buildLaunchDraft,
+  bumpProvider,
+  DEFAULT_LAUNCH_MODE,
+  dimProvider,
+  emptyCounts,
+  ENGINES,
+  LAUNCH_MODES,
+  ORCA_AGENT_BY_PROVIDER,
+  orcaAgentForProvider,
+  promptContentFor,
+  promptIsEmpty,
+  providerCount,
+  savedAsName,
+  shortProviderName,
+  toggleProviderCounts,
+  totalAgents,
+  validateAgents,
+  type LaunchMode,
+} from './launch-form'
 
 const _t = tmpdir() as string
 const _r = mkdtempSync(join(_t, 'launch-form-'))
@@ -14,30 +34,67 @@ const PROMPTS: PromptMeta[] = [
   { slug: 'exploit', name: 'Exploit', content: 'busca explotables' },
 ]
 
-describe('toggleProvider (multi-selección de proveedores)', () => {
-  it('alterna añadir y quitar, sin límite', () => {
-    let s = new Set<string>()
-    s = toggleProvider(s, 'Pi')
-    s = toggleProvider(s, 'Claude Code')
-    s = toggleProvider(s, 'Pi')
-    expect([...s]).toEqual(['Claude Code'])
-  })
+describe('contadores de agentes (paso 2 reformado)', () => {
   it('ENGINES tiene los 6 en orden', () => {
     expect(ENGINES).toEqual(['Pi', 'Hermes Agent', 'Claude Code', 'Kimi Code', 'Zcode', 'Deepseek'])
   })
+
+  it('marcar arranca en 1; desmarcar QUITA el provider (equivale a 0)', () => {
+    let c = toggleProviderCounts(emptyCounts(), 'Pi')
+    expect(providerCount(c, 'Pi')).toBe(1)
+    c = toggleProviderCounts(c, 'Pi')
+    expect(providerCount(c, 'Pi')).toBe(0) // quitado vía desmarcar
+  })
+
+  it('contador mínimo 1: dim no baja de 1 ni a cero/negativo', () => {
+    let c: Record<string, number> = { Pi: 1 }
+    c = dimProvider(c, 'Pi')
+    expect(providerCount(c, 'Pi')).toBe(1)
+    c = bumpProvider(c, 'Pi')
+    c = dimProvider(c, 'Pi')
+    expect(providerCount(c, 'Pi')).toBe(1)
+  })
+
+  it('total de agentes = suma de contadores', () => {
+    const c: Record<string, number> = { Pi: 2, 'Hermes Agent': 1 }
+    expect(totalAgents(c)).toBe(3)
+  })
 })
 
-describe('validateLaunch (confirmar)', () => {
-  it('sin proveedor → error', () => {
-    expect(validateLaunch(new Set())).toBe('Selecciona al menos un proveedor.')
+describe('expandir contadores → agentes con labels', () => {
+  it('Pi=2 + Hermes=1 → 3 agentes con labels Pi #1/Pi #2/Hermes #1', () => {
+    const c = { Pi: 2, 'Hermes Agent': 1 }
+    const agents = agentsFromCounts(c)
+    expect(agents).toHaveLength(3)
+    expect(agents.map((a) => a.label)).toEqual(['Pi #1', 'Pi #2', 'Hermes #1'])
+    expect(agents.map((a) => a.provider)).toEqual(['pi', 'pi', 'hermes'])
   })
-  it('con proveedor pero prompt vacío → error', () => {
-    expect(validateLaunch(new Set(['Pi']), '')).toBe('El prompt no puede estar vacío.')
-    expect(validateLaunch(new Set(['Pi']), '   \n  ')).toBe('El prompt no puede estar vacío.')
+
+  it('varios del mismo provider son agentes distintos', () => {
+    const agents = agentsFromCounts({ Pi: 2 })
+    expect(agents[0]!.label).toBe('Pi #1')
+    expect(agents[1]!.label).toBe('Pi #2')
+    expect(agents[0]!.provider).toBe(agents[1]!.provider)
   })
-  it('con proveedor y prompt con contenido → null (válido)', () => {
-    expect(validateLaunch(new Set(['Pi']), 'actúa como pentester')).toBeNull()
-    expect(validateLaunch(new Set(['Pi', 'Deepseek', 'Zcode']), 'prompt válido')).toBeNull()
+
+  it('labels auto por shortProviderName', () => {
+    expect(shortProviderName('Claude Code')).toBe('Claude')
+    expect(agentsFromCounts({ 'Claude Code': 1 })[0]!.label).toBe('Claude #1')
+  })
+})
+
+describe('validateAgents (cada agente con prompt no vacío)', () => {
+  it('sin agentes → error', () => {
+    expect(validateAgents([])).toBe('Selecciona al menos un agente.')
+  })
+  it('un agente con prompt vacío → error con su label', () => {
+    expect(validateAgents([{ provider: 'pi', prompt: '   ', label: 'Pi #1' }])).toBe('El prompt de «Pi #1» no puede estar vacío.')
+  })
+  it('todos con contenido → null', () => {
+    expect(validateAgents([
+      { provider: 'pi', prompt: 'a', label: 'Pi #1' },
+      { provider: 'claude', prompt: 'b', label: 'Claude #1' },
+    ])).toBeNull()
   })
 })
 
@@ -93,24 +150,53 @@ describe('PASO 3 — modo de lanzamiento y LaunchDraft', () => {
       assets: ['https://a.test'],
       username: 'u',
       password: 'p',
-      providers: ['Pi', 'Deepseek'],
-      prompt: 'prompt final',
+      agents: [
+        { provider: 'pi', prompt: 'p1', label: 'Pi #1' },
+        { provider: 'deepseek', prompt: 'p2', label: 'Deepseek #1' },
+      ],
       mode: 'terminal' as LaunchMode,
     })
     expect(draft).toEqual({
       assets: ['https://a.test'],
       username: 'u',
       password: 'p',
-      providers: ['Pi', 'Deepseek'],
-      prompt: 'prompt final',
+      agents: [
+        { provider: 'pi', prompt: 'p1', label: 'Pi #1' },
+        { provider: 'deepseek', prompt: 'p2', label: 'Deepseek #1' },
+      ],
       mode: 'terminal',
     })
   })
 
   it('el modo por defecto es orca al construir el draft', () => {
     const draft = buildLaunchDraft({
-      assets: [], username: '', password: '', providers: ['Pi'], prompt: '', mode: DEFAULT_LAUNCH_MODE,
+      assets: [], username: '', password: '',
+      agents: [{ provider: 'pi', prompt: '', label: 'Pi #1' }],
+      mode: DEFAULT_LAUNCH_MODE,
     })
     expect(draft.mode).toBe('orca')
+  })
+})
+
+describe('ORCA_AGENT_BY_PROVIDER (mapeo proveedor → id de agente Orca)', () => {
+  it('todos los proveedores del asistente están mapeados en UN solo sitio', () => {
+    expect(ORCA_AGENT_BY_PROVIDER).toEqual({
+      Pi: 'pi',
+      'Claude Code': 'claude',
+      'Hermes Agent': 'hermes',
+      'Kimi Code': 'kimi',
+      Zcode: 'zcode',
+      Deepseek: 'deepseek',
+    })
+  })
+
+  it('orcaAgentForProvider devuelve el id o cadena vacía si no está mapeado', () => {
+    expect(orcaAgentForProvider('Pi')).toBe('pi')
+    expect(orcaAgentForProvider('Claude Code')).toBe('claude')
+    expect(orcaAgentForProvider('Hermes Agent')).toBe('hermes')
+    expect(orcaAgentForProvider('Kimi Code')).toBe('kimi')
+    expect(orcaAgentForProvider('Zcode')).toBe('zcode') // id por confirmar
+    expect(orcaAgentForProvider('Deepseek')).toBe('deepseek') // id por confirmar
+    expect(orcaAgentForProvider('Proveedor inválido')).toBe('')
   })
 })

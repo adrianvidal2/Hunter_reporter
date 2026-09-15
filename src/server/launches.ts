@@ -12,6 +12,10 @@ import { resolveSafeAllowMissing } from '@/core/fs/paths'
 export interface LaunchRecord {
   timestamp: number
   provider: string
+  /** nombre corto del agente ("Pi #1"), si aplica. */
+  label?: string
+  /** Prompt ENTERO usado (el que realmente se lanzó, aunque se editara). */
+  prompt?: string
   /** Assets del scope seleccionados (paso 1 del asistente). */
   scopeSeleccionado: string[]
   mode: string

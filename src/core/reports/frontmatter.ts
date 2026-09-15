@@ -15,8 +15,9 @@
  * metadato inserta el bloque al inicio.
  */
 
-/** Las cuatro claves que gestiona el panel (4.10). */
-export type MetaField = 'title' | 'severity' | 'cvss' | 'state'
+/** Las claves que gestiona el panel (4.10; cvss_vector añadido con la
+ *  calculadora CVSS). */
+export type MetaField = 'title' | 'severity' | 'cvss' | 'state' | 'cvss_vector'
 export type MetaValues = Partial<Record<MetaField, string>>
 
 export interface FmLine {
@@ -115,7 +116,7 @@ export function getMeta(raw: string): MetaValues {
   const split = splitFrontMatter(raw)
   if (!split.hasFm) return {}
   const out: MetaValues = {}
-  for (const field of ['title', 'severity', 'cvss', 'state'] as MetaField[]) {
+  for (const field of ['title', 'severity', 'cvss', 'state', 'cvss_vector'] as MetaField[]) {
     const idx = findLine(split.lines, field)
     if (idx !== -1) {
       const parsed = parseLine(split.lines[idx]!) as FmLine & { valuePart: string }

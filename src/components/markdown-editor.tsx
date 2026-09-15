@@ -3,7 +3,7 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { saveFileAction } from '@/app/actions'
 import { createAutosaveScheduler, type AutosaveScheduler } from '@/lib/autosave'
-import { getMeta, updateMeta, type MetaField } from '@/core/reports/frontmatter'
+import { getMeta, updateMeta, type MetaValues } from '@/core/reports/frontmatter'
 import { CodeMirrorEditor } from './code-mirror-editor'
 import { FrontMatterPanel } from './front-matter-panel'
 import { MarkdownPreview } from './markdown-preview'
@@ -101,10 +101,13 @@ export default function MarkdownEditor({
     return () => window.removeEventListener('keydown', onKey, { capture: true })
   }, [save, saving])
 
-  // 4.10: metadatos derivados del documento (edición quirúrgica del YAML)
+  // 4.10: metadatos derivados del documento (edición quirúrgica del YAML).
+  // Acepta un LOTE de cambios: una sola llamada updateMeta evita que dos
+  // onChange seguidos compitan sobre el mismo `content` stale (la segunda
+  // machacaba a la primera y se perdía el cvss).
   const meta = useMemo(() => getMeta(content), [content])
-  const setMeta = (field: MetaField, value: string) => {
-    const next = updateMeta(content, { [field]: value })
+  const setMeta = (changes: MetaValues) => {
+    const next = updateMeta(content, changes)
     if (next !== content) {
       setContent(next)
       schedulerRef.current?.schedule()

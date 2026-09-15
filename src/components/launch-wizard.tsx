@@ -1,6 +1,6 @@
 'use client'
 
-import { useEffect, useRef, useState, useTransition } from 'react'
+import { useEffect, useMemo, useRef, useState, useTransition } from 'react'
 import type { PromptMeta } from '@/core/prompts/prompts'
 import { createPromptAction } from '@/app/prompts/actions'
 import { launchOrcaAction } from '@/app/proyectos/[project]/launch'
@@ -8,14 +8,23 @@ import type { Program } from '@/core/ywh/types'
 import {
   buildLaunchDraft,
   DEFAULT_LAUNCH_MODE,
+  agentsFromCounts,
+  bumpProvider,
+  dimProvider,
+  emptyCounts,
   ENGINES,
   LAUNCH_MODES,
   promptContentFor,
   promptIsEmpty,
+  providerCount,
   savedAsName,
-  toggleProvider,
-  validateLaunch,
+  shortProviderName,
+  toggleProviderCounts,
+  totalAgents,
+  validateAgents,
+  type LaunchAgent,
   type LaunchMode,
+  type ProviderCounts,
 } from '@/core/ywh/launch-form'
 
 /**
@@ -44,11 +53,25 @@ export function LaunchWizard({ project, program, prompts, onClose }: WizardProps
   const [username, setUsername] = useState('')
   const [password, setPassword] = useState('')
 
-  // PASO 2 — proveedores (multi) + prompt
-  const [providers, setProviders] = useState<Set<string>>(new Set())
+  // PASO 2 — AGENTES (contadores por provider) + prompts
+  const [counts, setCounts] = useState<ProviderCounts>(emptyCounts())
+  const [distinctPrompts, setDistinctPrompts] = useState(false)
+  /** Edición por agente ("Pi #1" → texto) cuando hay "distintos prompts". */
+  const [promptByLabel, setPromptByLabel] = useState<Record<string, string>>({})
+  /** slug de biblioteca + texto en el editor compartido. */
   const [promptSlug, setPromptSlug] = useState<string | null>(null)
   const [promptText, setPromptText] = useState('')
   const [saveNote, setSaveNote] = useState<string | null>(null)
+
+  // Agentes expandidos (para validar y para el resumen)
+  const agents = useMemo(() => {
+    // sin "distintos prompts": todos con el texto del editor compartido
+    const perLabel: Record<string, string> = {}
+    for (const a of agentsFromCounts(counts)) perLabel[a.label] = promptText
+    return agentsFromCounts(counts, distinctPrompts ? promptByLabel : perLabel)
+  }, [counts, distinctPrompts, promptByLabel, promptText])
+
+  const totalAgentsCount = useMemo(() => totalAgents(counts), [counts])
 
   // PASO 3 — modo de lanzamiento (radio exclusivo; Orca por defecto)
   const [mode, setMode] = useState<LaunchMode>(DEFAULT_LAUNCH_MODE)
@@ -87,15 +110,22 @@ export function LaunchWizard({ project, program, prompts, onClose }: WizardProps
       return next
     })
 
-  // Selector de prompt de la biblioteca → carga su texto en el editor.
-  const pickPrompt = (slug: string) => {
+  // Selector de prompt de la biblioteca → el contenido actual se rellena
+  // en el editor activo (compartido o del agente actual).
+  const pickPrompt = (slug: string, agentLabel?: string) => {
     setPromptSlug(slug)
-    setPromptText(promptContentFor(prompts, slug))
+    const content = promptContentFor(prompts, slug)
+    if (distinctPrompts && agentLabel) {
+      setPromptByLabel((prev) => ({ ...prev, [agentLabel]: content }))
+    } else {
+      setPromptText(content)
+    }
     setSaveNote(null)
   }
 
   // "Guardar como": crea <nombre>_<programa> sin pisar el original.
   const saveAs = () => {
+    if (distinctPrompts) return // por agente: se guarda el del label activo
     setError(null)
     setSaveNote(null)
     const name = savedAsName(promptSlug ?? 'prompt', project)
@@ -109,9 +139,9 @@ export function LaunchWizard({ project, program, prompts, onClose }: WizardProps
     })
   }
 
-  // Confirmar: en modo Orca lanza el worktree (solo proveedor Pi por ahora).
+  // Confirmar: valida agentes (≥1, prompts no vacíos) y lanza.
   const confirm = () => {
-    const err = validateLaunch(providers, promptText)
+    const err = validateAgents(agents)
     if (err) {
       setError(err)
       return
@@ -123,30 +153,31 @@ export function LaunchWizard({ project, program, prompts, onClose }: WizardProps
       assets: [...checked],
       username,
       password,
-      providers,
-      prompt: promptText,
+      agents,
       mode,
     })
 
     if (mode === 'orca') {
-      if (!providers.has('Pi')) {
-        setError('El modo Orca por ahora solo soporta el proveedor Pi.')
-        return
-      }
       setLaunching(true)
       startTransition(async () => {
         const res = await launchOrcaAction({
           project,
           selectedScopes: draft.assets,
           mode: 'orca',
-          prompt: draft.prompt,
+          agents: draft.agents,
         })
         setLaunching(false)
         setSaveNote(null)
         if (res.ok) {
+          // Resumen por agente: cuáles arrancaron y cuáles fallaron.
+          const lines = res.providers.map((p) =>
+            p.ok
+              ? `✓ ${p.label} → worktree ${p.worktreeId ?? ''}${p.handle ? ` (${p.handle})` : ''}`
+              : `✗ ${p.label} → ${p.error ?? 'error'}`,
+          )
           setLaunchOutcome(
-            `✓ Worktree ${res.worktreeId ?? ''} creado${res.handle ? ` (handle ${res.handle})` : ''}.` +
-              (res.note ? ` ${res.note}` : ''),
+            ['Se lanzó un worktree por agente:', ...lines].join('\n') +
+              (res.note ? `\n${res.note}` : ''),
           )
         } else {
           setError(res.error)
@@ -155,12 +186,12 @@ export function LaunchWizard({ project, program, prompts, onClose }: WizardProps
     } else {
       // Modo Terminal: fase posterior, solo recoge en memoria.
       setSaveNote(
-        `Recogido en memoria: ${draft.providers.length} proveedor(es), prompt listo, modo «${draft.mode}». (Modo Terminal aún no implementado.)`,
+        `Recogido en memoria: ${draft.agents.length} agente(s), prompts listos, modo «${draft.mode}». (Modo Terminal aún no implementado.)`,
       )
     }
   }
 
-  const cancelProvider = (name: string) => setProviders((prev) => toggleProvider(prev, name))
+  const cancelProvider = (name: string) => setCounts((prev) => toggleProviderCounts(prev, name))
 
   return (
     <div
@@ -242,82 +273,170 @@ export function LaunchWizard({ project, program, prompts, onClose }: WizardProps
           </div>
         ) : step === 2 ? (
           <div className="mt-4 space-y-4">
-            {/* Proveedores (multi) */}
+            {/* AGENTES: contadores por provider */}
             <div>
               <h3 className="text-sm font-semibold">
-                Proveedores <span className="text-zinc-400">({providers.size} marcados)</span>
+                Agentes <span className="text-zinc-400">({totalAgentsCount})</span>
               </h3>
-              <p className="mt-0.5 text-xs text-zinc-500 dark:text-zinc-400">Puedes marcar varios, en cualquier combinación.</p>
+              <p className="mt-0.5 text-xs text-zinc-500 dark:text-zinc-400">
+                Marca cada provider y ajusta cuántos agentes de cada uno. Total = suma de contadores.
+              </p>
               <ul className="mt-2 grid grid-cols-1 gap-1.5 sm:grid-cols-2">
                 {ENGINES.map((name) => {
-                  const active = providers.has(name)
+                  const active = providerCount(counts, name) > 0
+                  const n = providerCount(counts, name)
                   return (
-                    <li key={name}>
-                      <label
-                        className={`flex cursor-pointer items-center gap-2 rounded-md border px-3 py-2 text-sm transition-colors ${
-                          active
-                            ? 'border-zinc-900 bg-zinc-100 dark:border-zinc-100 dark:bg-zinc-800'
-                            : 'border-zinc-300 hover:bg-zinc-50 dark:border-zinc-700 dark:hover:bg-zinc-900'
-                        }`}
-                      >
+                    <li
+                      key={name}
+                      className={`flex items-center justify-between gap-2 rounded-md border px-3 py-2 text-sm transition-colors ${
+                        active
+                          ? 'border-zinc-900 bg-zinc-100 dark:border-zinc-100 dark:bg-zinc-800'
+                          : 'border-zinc-300 hover:bg-zinc-50 dark:border-zinc-700 dark:hover:bg-zinc-900'
+                      }`}
+                    >
+                      <label className="flex min-w-0 flex-1 cursor-pointer items-center gap-2 truncate">
                         <input type="checkbox" checked={active} onChange={() => cancelProvider(name)} className="h-4 w-4" />
-                        {name}
+                        <span className="truncate">{name}</span>
                       </label>
+                      {active ? (
+                        <span className="flex shrink-0 items-center gap-1">
+                          <button
+                            type="button"
+                            onClick={() => setCounts((prev) => dimProvider(prev, name))}
+                            disabled={n <= 1}
+                            aria-label={`Bajar cantidad de ${name}`}
+                            className="h-6 w-6 rounded border border-zinc-300 text-xs hover:bg-zinc-200 disabled:opacity-40 dark:border-zinc-700 dark:hover:bg-zinc-800"
+                          >
+                            −
+                          </button>
+                          <span className="w-5 text-center tabular-nums">{n}</span>
+                          <button
+                            type="button"
+                            onClick={() => setCounts((prev) => bumpProvider(prev, name))}
+                            aria-label={`Subir cantidad de ${name}`}
+                            className="h-6 w-6 rounded border border-zinc-300 text-xs hover:bg-zinc-200 dark:border-zinc-700 dark:hover:bg-zinc-800"
+                          >
+                            +
+                          </button>
+                        </span>
+                      ) : null}
                     </li>
                   )
                 })}
               </ul>
             </div>
 
-            {/* Prompt: biblioteca / al vuelo */}
-            <div>
-              <div className="flex items-center justify-between gap-2">
-                <h3 className="text-sm font-semibold">Prompt</h3>
-                <button
-                  type="button"
-                  onClick={saveAs}
-                  disabled={pending || promptText.trim() === ''}
-                  className="rounded-md border border-zinc-300 px-2.5 py-1 text-xs hover:bg-zinc-100 disabled:opacity-40 dark:border-zinc-700 dark:hover:bg-zinc-900"
-                  title="Guarda este texto como un prompt NUEVO en la biblioteca (no pisa el original)"
-                >
-                  Guardar como…
-                </button>
-              </div>
-              <select
-                value={promptSlug ?? ''}
-                onChange={(e) => pickPrompt(e.target.value)}
-                className="mt-1.5 w-full rounded-md border border-zinc-300 bg-transparent px-2.5 py-1.5 text-sm outline-none focus:border-zinc-500 dark:border-zinc-700 dark:[color-scheme:dark]"
-                aria-label="Elegir prompt de la biblioteca"
-              >
-                <option value="">— escribir uno nuevo —</option>
-                {prompts.map((p) => (
-                  <option key={p.slug} value={p.slug}>{p.name} ({p.slug})</option>
+            {/* Distintos prompts */}
+            {totalAgentsCount >= 1 ? (
+              <label className="flex items-center gap-2 text-sm">
+                <input
+                  type="checkbox"
+                  checked={distinctPrompts}
+                  disabled={totalAgentsCount === 1}
+                  onChange={(e) => setDistinctPrompts(e.target.checked)}
+                  className="h-4 w-4"
+                />
+                <span className={totalAgentsCount === 1 ? 'text-zinc-400 dark:text-zinc-500' : ''}>
+                  Distintos prompts (uno por agente)
+                </span>
+              </label>
+            ) : null}
+
+            {/* Editor/es de prompt */}
+            {distinctPrompts ? (
+              <div className="space-y-4">
+                {agents.map((a) => (
+                  <div key={a.label}>
+                    <div className="flex items-center justify-between gap-2">
+                      <h4 className="text-sm font-semibold">Prompt · {a.label}</h4>
+                      <button
+                        type="button"
+                        onClick={saveAs}
+                        disabled={pending || promptByLabel[a.label]?.trim() === ''}
+                        className="rounded-md border border-zinc-300 px-2.5 py-1 text-xs hover:bg-zinc-100 disabled:opacity-40 dark:border-zinc-700 dark:hover:bg-zinc-900"
+                        title="Guarda este texto como un prompt NUEVO en la biblioteca"
+                      >
+                        Guardar como…
+                      </button>
+                    </div>
+                    <select
+                      value=""
+                      onChange={(e) => pickPrompt(e.target.value, a.label)}
+                      className="mt-1.5 w-full rounded-md border border-zinc-300 bg-transparent px-2.5 py-1.5 text-sm outline-none focus:border-zinc-500 dark:border-zinc-700 dark:[color-scheme:dark]"
+                      aria-label={`Elegir prompt de ${a.label} en la biblioteca`}
+                    >
+                      <option value="">— cargar de la biblioteca o escribir abajo —</option>
+                      {prompts.map((p) => (
+                        <option key={p.slug} value={p.slug}>{p.name} ({p.slug})</option>
+                      ))}
+                    </select>
+                    <textarea
+                      value={promptByLabel[a.label] ?? ''}
+                      onChange={(e) =>
+                        setPromptByLabel((prev) => ({ ...prev, [a.label]: e.target.value }))
+                      }
+                      rows={5}
+                      placeholder={`Prompt para ${a.label}…`}
+                      className="mt-1.5 w-full rounded-md border border-zinc-300 bg-transparent px-2.5 py-1.5 font-mono text-sm outline-none focus:border-zinc-500 dark:border-zinc-700 dark:[color-scheme:dark]"
+                    />
+                    {promptIsEmpty(promptByLabel[a.label] ?? '') ? (
+                      <p role="alert" className="mt-1 text-xs text-amber-600 dark:text-amber-400">
+                        El prompt de «{a.label}» no puede estar vacío para confirmar.
+                      </p>
+                    ) : null}
+                  </div>
                 ))}
-              </select>
-              <p className="mt-1 text-[11px] text-zinc-400">
-                Elegir uno carga su texto abajo; puedes editarlo sin tocar el original. Si no eliges ninguno, escribe tu prompt aquí.
-              </p>
-              <textarea
-                value={promptText}
-                onChange={(e) => setPromptText(e.target.value)}
-                rows={7}
-                placeholder="Escribe aquí el prompt…"
-                className="mt-1.5 w-full rounded-md border border-zinc-300 bg-transparent px-2.5 py-1.5 font-mono text-sm outline-none focus:border-zinc-500 dark:border-zinc-700 dark:[color-scheme:dark]"
-              />
-              {promptIsEmpty(promptText) ? (
-                <p role="alert" className="mt-1 text-xs text-amber-600 dark:text-amber-400">
-                  El prompt no puede estar vacío para confirmar.
+              </div>
+            ) : (
+              <div>
+                <div className="flex items-center justify-between gap-2">
+                  <h3 className="text-sm font-semibold">Prompt (compartido por todos los agentes)</h3>
+                  <button
+                    type="button"
+                    onClick={saveAs}
+                    disabled={pending || promptText.trim() === ''}
+                    className="rounded-md border border-zinc-300 px-2.5 py-1 text-xs hover:bg-zinc-100 disabled:opacity-40 dark:border-zinc-700 dark:hover:bg-zinc-900"
+                    title="Guarda este texto como un prompt NUEVO en la biblioteca (no pisa el original)"
+                  >
+                    Guardar como…
+                  </button>
+                </div>
+                <select
+                  value={promptSlug ?? ''}
+                  onChange={(e) => pickPrompt(e.target.value)}
+                  className="mt-1.5 w-full rounded-md border border-zinc-300 bg-transparent px-2.5 py-1.5 text-sm outline-none focus:border-zinc-500 dark:border-zinc-700 dark:[color-scheme:dark]"
+                  aria-label="Elegir prompt de la biblioteca"
+                >
+                  <option value="">— escribir uno nuevo —</option>
+                  {prompts.map((p) => (
+                    <option key={p.slug} value={p.slug}>{p.name} ({p.slug})</option>
+                  ))}
+                </select>
+                <p className="mt-1 text-[11px] text-zinc-400">
+                  Elegir uno carga su texto abajo; puedes editarlo sin tocar el original. Si no eliges ninguno, escribe tu prompt aquí.
                 </p>
-              ) : null}
-            </div>
+                <textarea
+                  value={promptText}
+                  onChange={(e) => setPromptText(e.target.value)}
+                  rows={7}
+                  placeholder="Escribe aquí el prompt…"
+                  className="mt-1.5 w-full rounded-md border border-zinc-300 bg-transparent px-2.5 py-1.5 font-mono text-sm outline-none focus:border-zinc-500 dark:border-zinc-700 dark:[color-scheme:dark]"
+                />
+                {promptIsEmpty(promptText) ? (
+                  <p role="alert" className="mt-1 text-xs text-amber-600 dark:text-amber-400">
+                    El prompt no puede estar vacío para confirmar.
+                  </p>
+                ) : null}
+              </div>
+            )}
 
             <div className="flex justify-end gap-2 pt-1">
               <button type="button" onClick={() => setStep(1)} disabled={pending} className="rounded-md border border-zinc-300 px-4 py-1.5 text-sm disabled:opacity-40 dark:border-zinc-700">← Atrás</button>
               <button
                 type="button"
                 onClick={() => setStep(3)}
-                disabled={providers.size === 0 || promptIsEmpty(promptText)}
-                title={promptIsEmpty(promptText) ? 'El prompt no puede estar vacío' : undefined}
+                disabled={validateAgents(agents) !== null}
+                title={validateAgents(agents) ?? undefined}
                 className="rounded-md bg-zinc-900 px-4 py-1.5 text-sm font-medium text-zinc-50 hover:bg-zinc-700 disabled:opacity-40 dark:bg-zinc-100 dark:text-zinc-900 dark:hover:bg-zinc-300"
               >
                 Siguiente →
@@ -362,9 +481,9 @@ export function LaunchWizard({ project, program, prompts, onClose }: WizardProps
               </p>
             ) : null}
             {launchOutcome ? (
-              <p role="status" className="rounded-md bg-emerald-50 px-3 py-2 text-sm text-emerald-700 dark:bg-emerald-950 dark:text-emerald-300">
+              <pre role="status" className="whitespace-pre-line rounded-md bg-emerald-50 px-3 py-2 text-sm text-emerald-700 dark:bg-emerald-950 dark:text-emerald-300">
                 {launchOutcome}
-              </p>
+              </pre>
             ) : null}
 
             <div className="flex justify-end gap-2 pt-1">
@@ -372,8 +491,8 @@ export function LaunchWizard({ project, program, prompts, onClose }: WizardProps
               <button
                 type="button"
                 onClick={confirm}
-                disabled={promptIsEmpty(promptText) || launching}
-                title={promptIsEmpty(promptText) ? 'El prompt no puede estar vacío' : undefined}
+                disabled={validateAgents(agents) !== null || launching}
+                title={validateAgents(agents) ?? undefined}
                 className="rounded-md bg-zinc-900 px-4 py-1.5 text-sm font-medium text-zinc-50 hover:bg-zinc-700 disabled:opacity-40 dark:bg-zinc-100 dark:text-zinc-900 dark:hover:bg-zinc-300"
               >
                 {launching ? 'Lanzando…' : 'Confirmar'}

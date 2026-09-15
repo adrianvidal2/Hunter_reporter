@@ -1,7 +1,9 @@
 import { createWatcher, type WatchEvent } from '@/core/fs/watcher'
+import { sha256File } from '@/core/fs/hash'
 import { defaultDbPath } from '@/db/db'
 import { listPending, registerPendingFile } from '@/db/pending'
 import { getEnv } from '@/lib/env'
+import { peekOwnWrite } from './own-writes'
 
 /**
  * Servicio watcher→BD→SSE (paso 6.3), SINGLETON por root.
@@ -32,6 +34,41 @@ export interface WatcherService {
 
 const globalStore = globalThis as typeof globalThis & {
   __reporterWatcherServices?: Map<string, WatcherService>
+}
+
+/**
+ * Decide qué hace un evento del watcher (exportado para tests).
+ *
+ * Filtro own-writes: si la app registró una escritura para ese path
+ * (saveFileAction, aceptar reescritura, mover a proyecto) y el hash ACTUAL
+ * en disco coincide, es escritura nuestra → NO alimenta Pendientes. Si el
+ * hash difiere (después del guardado llegó algo distinto de fuera) o no hay
+ * registro (API de ingesta, copia a mano), se registra como siempre.
+ */
+export function handleWatchEvent(
+  event: WatchEvent,
+  root: string,
+  dbPath: string,
+  broadcast: (payload: SsePayload) => void,
+): void {
+  if (event.type === 'unlink') return // 6.5 decide qué hacer con borrados
+
+  const ownHash = peekOwnWrite(event.absPath)
+  if (ownHash !== null) {
+    let current: string | null = null
+    try {
+      current = sha256File(event.absPath)
+    } catch {
+      // borrado entre el guardado y el evento: nada que registrar
+    }
+    if (current === null) return
+    if (current === ownHash) return // nuestra propia escritura
+    // hash distinto → el contenido nuevo llegó de fuera → registrar abajo
+  }
+
+  const outcome = registerPendingFile(event.absPath, root, dbPath)
+  broadcast({ type: 'pending', path: event.relPath, outcome })
+  broadcast({ type: 'count', count: listPending(dbPath).length })
 }
 
 export function getWatcherService(
@@ -78,14 +115,7 @@ function createService(
   }
   const broadcastCount = () => broadcast({ type: 'count', count: listPending(dbPath).length })
 
-  const onEvent = (event: WatchEvent) => {
-    if (event.type === 'unlink') return // 6.5 decide qué hacer con borrados
-    const outcome = registerPendingFile(event.absPath, root, dbPath)
-    broadcast({ type: 'pending', path: event.relPath, outcome })
-    broadcastCount()
-  }
-
-  const watcher = createWatcher(root, onEvent)
+  const watcher = createWatcher(root, (event) => handleWatchEvent(event, root, dbPath, broadcast))
 
   return {
     ready: watcher.ready,

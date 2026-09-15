@@ -3,6 +3,8 @@
 import { revalidatePath } from 'next/cache'
 import { statSync } from 'node:fs'
 import { writeAtomic } from '@/core/fs/atomic'
+import { sha256Content, sha256File } from '@/core/fs/hash'
+import { markOwnWrite } from '@/server/own-writes'
 import { saveHistoryCopy } from '@/core/fs/history'
 import { ConflictError, moveFile } from '@/core/fs/move'
 import { PathEscapeError, resolveSafe } from '@/core/fs/paths'
@@ -107,6 +109,8 @@ export async function saveFileAction(
     saveHistoryCopy(relPath, getEnv().REPORTS_ROOT)
 
     writeAtomic(relPath, content, { root: getEnv().REPORTS_ROOT })
+    // Guardado de la app: marcar para que el watcher NO lo mande a Pendientes
+    markOwnWrite(absPath, sha256Content(content))
     // mtime real tras el rename: la nueva línea base del editor
     return { ok: true, mtimeMs: Math.round(statSync(absPath).mtimeMs) }
   } catch (err) {
@@ -173,7 +177,10 @@ export async function moveFileAction(
       return { ok: false, error: `El proyecto «${targetProject}» no existe` }
     }
     const targetDir = fileName.toLowerCase().endsWith('.pdf') ? 'REPORTES_YWH' : 'reportes'
-    moveFile(relPath, `${targetProject}/${targetDir}/${fileName}`, { root })
+    const targetRel = `${targetProject}/${targetDir}/${fileName}`
+    moveFile(relPath, targetRel, { root })
+    // Movimiento de la app: el destino no es un fichero que "llega de fuera"
+    markOwnWrite(resolveSafe(targetRel, root), sha256File(resolveSafe(targetRel, root)))
   } catch (err) {
     if (err instanceof ConflictError) {
       return { ok: false, error: `Ya existe «${fileName}» en ${targetProject}` }

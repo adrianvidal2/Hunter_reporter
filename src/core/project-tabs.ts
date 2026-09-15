@@ -3,9 +3,9 @@
  * Permite testear el orden y la pestaña activa por defecto sin jsdom.
  */
 
-export type ProjectTab = 'entregados' | 'borradores' | 'programa'
+export type ProjectTab = 'entregados' | 'borradores' | 'programa' | 'escaneos' | 'recon'
 
-export const PROJECT_TAB_ORDER: ProjectTab[] = ['programa', 'entregados', 'borradores']
+export const PROJECT_TAB_ORDER: ProjectTab[] = ['programa', 'entregados', 'borradores', 'escaneos', 'recon']
 
 /** Pestaña activa por defecto al abrir un proyecto. */
 export function defaultProjectTab(): ProjectTab {

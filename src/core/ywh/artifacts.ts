@@ -3,6 +3,7 @@ import path from 'node:path'
 import { getEnv } from '../../lib/env'
 import { writeAtomic } from '../fs/atomic'
 import { createProject } from '../fs/projects'
+import { writePlatformJson } from '../programs/platform-file'
 import { renderProgramMarkdown } from './render'
 import type { Program } from './types'
 
@@ -46,6 +47,9 @@ export function writeProgramArtifacts(
 ): ProgramArtifactsResult {
   const projDir = createProject(slug, root) // asegura REPORTES_YWH/ + reportes/ sin tocar nada más
   mkdirSync(path.join(projDir, 'pentest'), { recursive: true })
+
+  // Marca de plataforma en la raíz del proyecto (paso 4)
+  writePlatformJson(slug, { platform: 'yeswehack', slug }, root)
 
   // JSON crudo del último fetch (siempre fresco, atómico)
   const jsonRelPath = `${slug}/pentest/programa.json`
