@@ -1,71 +1,71 @@
-# Intigriti Researcher API — contratos (verificado en vivo 2026-08-29)
+# Intigriti Researcher API — verified contracts (checked live 2026-08-29)
 
-> Investigación para la segunda plataforma. Espec OpenAPI guardado como
-> fixture permanente: `docs/fixtures/intigriti/intigriti-swagger-v1.0.json`
-> (OpenAPI 3.0, versión 1.0, 6 rutas — API «Researcher»).
+> Research for the second platform. OpenAPI spec saved as a permanent fixture:
+> `docs/fixtures/intigriti/intigriti-swagger-v1.0.json`
+> (OpenAPI 3.0, version 1.0, 6 routes — "Researcher" API).
 >
-> Fixtures anonimizados: `programs-page1.json` (item de lista) y
-> `program-detail.json` (detalle completo con domains + ROE).
+> Anonymized fixtures: `programs-page1.json` (list item) and
+> `program-detail.json` (full detail with domains + ROE).
 
 ---
 
-## ⛔ NO HAY SUBMISSIONS EN ESTA API (respuesta definitiva — no reinvestigar)
+## ⛔ NO SUBMISSIONS IN THIS API (final answer — do not research again)
 
-**La API de researcher de Intigriti NO expone tus submissions ni su estado.**
-El spec completo (6 rutas) solo cubre: programas (lista/detalle), domains,
-rules-of-engagements, activities (feed de programas) y payouts (BETA). No hay
-equivalente a `GET /user/reports` de YesWeHack, ni endpoint privado fuera de
-este spec para researchers. Cualquier «seguimiento de submissions» tendría
-que hacerse fuera de la API oficial (web scraping), que NO es plan. Cerrado.
+**The Intigriti researcher API does not expose your submissions or their
+status.** The full spec (6 routes) only covers: programs (list/detail),
+domains, rules-of-engagements, activities (program feed) and payouts (BETA).
+There is no equivalent to YesWeHack's `GET /user/reports`, and no private
+endpoint outside this spec for researchers. Any "submission tracking" would
+have to be done outside the official API (web scraping), which is NOT the
+plan. Closed.
 
----
-
-## Base URL y auth (verificado en vivo ✅ 2026-08-29)
+## Base URL and auth (verified live ✅ 2026-08-29)
 
 - Base: `https://api.intigriti.com/external/researcher`
-- Auth: **`Authorization: Bearer <TOKEN>`** — verificado con token real:
-  `GET /v1/programs?limit=3&offset=0` → **HTTP 200**. El spec lo declara
-  como `bearerAuth` (HTTP Bearer); el token es un **PAT de larga duración**
-  (66 chars, no un JWT de sesión corto como el de YWH): se crea en la web
-  (perfil → API → researcher) y no caduca cada horas.
-- Sin auth / token inválido: **401** `{"code":"UNAUTH001","title":"Access
-  denied.","status":401,"identifier":"<uuid>","extraParameters":{}}` (mismo
-  cuerpo para cualquier esquema erróneo; el gateway no revela cuál espera).
-- **No hay endpoints públicos**: sin token, `/v1/programs` es 401. La
-  degradación a «solo públicos» de YWH aquí NO existe.
+- Auth: **`Authorization: Bearer <TOKEN>`** — verified live with a real token:
+  `GET /v1/programs?limit=3&offset=0` → **HTTP 200**. The spec declares it as
+  `bearerAuth` (HTTP Bearer); the token is a **long-lived PAT** (66 chars, not
+  a short-lived session JWT like YWH's): created on the website
+  (profile → API → researcher), does not expire every few hours.
+- No auth / invalid token: **401** `{"code":"UNAUTH001","title":"Access
+  denied.","status":401,"identifier":"<uuid>","extraParameters":{}}` (same
+  body for any wrong scheme; the gateway does not reveal which one it expects).
+- **No public endpoints**: without a token, `/v1/programs` is 401. YWH's
+  "public-only" degradation does NOT exist here.
 
-## Endpoints (los 6 del spec)
+## Endpoints (all 6 from the spec)
 
-| Método | Ruta | Qué da |
+| Method | Route | What it gives |
 |---|---|---|
-| GET | `/v1/programs` | Lista de programas (resumen, paginada) ✅ vivo |
-| GET | `/v1/programs/{programId}` | **Detalle** del programa ✅ vivo |
-| GET | `/v1/programs/{programId}/domains/{versionId}` | Scope por versión |
-| GET | `/v1/programs/{programId}/rules-of-engagements/{versionId}` | Reglas por versión |
-| GET | `/v1/programs/activities` | Feed de actividad de programas |
-| GET | `/v1/payouts` | Pagos (BETA) |
+| GET | `/v1/programs` | Program list (summary, paginated) ✅ live |
+| GET | `/v1/programs/{programId}` | Program **detail** ✅ live |
+| GET | `/v1/programs/{programId}/domains/{versionId}` | Scope per version |
+| GET | `/v1/programs/{programId}/rules-of-engagements/{versionId}` | Rules per version |
+| GET | `/v1/programs/activities` | Program activity feed |
+| GET | `/v1/payouts` | Payouts (BETA) |
 
-## ⛔ Submissions: NO expuestas (definitivo)
+## ⛔ Submissions: NOT exposed (final)
 
-La API de researcher **no expone mis submissions ni su estado** — no existe
-endpoint para ello en el spec (6 rutas arriba) y no hay API privada oficial
-alternativa. Equivalente de «mis reportes» de YWH: **no es posible**. Solo
-hay `payouts` (BETA) y `activities` (feed de programas, no de submissions).
+The researcher API does not expose my submissions or their status — no
+endpoint for it exists in the spec (6 routes above) and no official
+alternative private API exists. Equivalent of YWH's "my reports": **not
+possible**. Only `payouts` (BETA) and `activities` (program feed, not
+submissions).
 
-## Paginación (verificado en vivo ✅)
+## Pagination (verified live ✅)
 
-Por **offset**, no por página: `limit` (0..500) + `offset`.
+By **offset**, not page: `limit` (0..500) + `offset`.
 
 - `GET /v1/programs?limit=3&offset=0` → `{ "maxCount": 221, "records": [...] }`
-- `offset=1&limit=1` → salta el primer record (verificado).
-- `offset=9999` → **HTTP 200 con `records: []`** (graceful, igual que YWH).
-- Iterar: `offset += limit` hasta reunir `maxCount` records.
+- `offset=1&limit=1` → skips the first record (verified).
+- `offset=9999` → **HTTP 200 with `records: []`** (graceful, like YWH).
+- Iterate: `offset += limit` until `maxCount` records are gathered.
 
-## Item de LISTA (verificado en vivo, ver fixture anonimizado)
+## LIST item (verified live, see anonymized fixture)
 
 ```jsonc
 {
-  "id": "uuid (programId para el detalle)",
+  "id": "uuid (programId for the detail)",
   "handle": "innovapost-anon",
   "name": "…",
   "following": false,
@@ -79,67 +79,67 @@ Por **offset**, no por página: `limit` (0..500) + `offset`.
 }
 ```
 
-## Detalle (verificado en vivo ✅, ver fixture anonimizado)
+## Detail (verified live ✅, see anonymized fixture)
 
-Campos: los del overview + `domains` y `rulesOfEngagement` como VERSIONES
-incrustadas (con endpoints por versión además):
+Fields: overview fields + `domains` and `rulesOfEngagement` embedded as
+VERSIONS (with per-version endpoints too):
 
-- `domains: { id, createdAt, content: Domain[] }` — **6 entradas** en el
-  programa probado. Cada dominio: `{ id, type{id,value} (Wildcard/Url/…),
+- `domains: { id, createdAt, content: Domain[] }` — **6 entries** in the
+  tested program. Each domain: `{ id, type{id,value} (Wildcard/Url/…),
   endpoint, tier{id,value} (Critical/High/…/"No Bounty"), description,
-  requiredSkills[] }`. **El scope IN es esta lista** (no hay in/out
-  estructurados como en YWH; el out-of-scope vive en las reglas).
+  requiredSkills[] }`. **The IN scope is this list** (no structured in/out
+  like YWH; out-of-scope lives in the rules).
 - `rulesOfEngagement: { id, attachments[], createdAt, content }`:
-  - `content.description` — reglas completas (markdown).
-  - `content.testingRequirements`: **`userAgent`** (User-Agent requerido,
-    puede venir `""`), **`requestHeader`** (p. ej. `X-Intigriti-Username:
-    {Username}` — header obligatorio alternativo), `intigritiMe` (bool),
-    `automatedTooling` (int, política de tooling).
-  - `content.safeHarbour` — protección legal (bool).
+  - `content.description` — full rules (markdown).
+  - `content.testingRequirements`: **`userAgent`** (required User-Agent, may
+    be `""`), **`requestHeader`** (e.g. `X-Intigriti-Username:
+    {Username}` — alternative mandatory header), `intigritiMe` (bool),
+    `automatedTooling` (int, tooling policy).
+  - `content.safeHarbour` — legal protection (bool).
 
-## Equivalencias con la pestaña Programa (YWH → Intigriti)
+## Mapping to the Program tab (YWH → Intigriti)
 
-| Concepto | YWH | Intigriti |
+| Concept | YWH | Intigriti |
 |---|---|---|
-| Lista | `/programs?page=N` `{items,pagination}` | `/v1/programs?limit&offset` `{maxCount,records}` |
-| Detalle | `/programs/{slug}` 74 campos | `/v1/programs/{programId}` (con domains+ROE versionados) |
+| List | `/programs?page=N` `{items,pagination}` | `/v1/programs?limit&offset` `{maxCount,records}` |
+| Detail | `/programs/{slug}` 74 fields | `/v1/programs/{programId}` (with versioned domains+ROE) |
 | Scope IN | `scopes[]` | `domains.content[]` (endpoint, tier, type, description) |
-| Scope OUT | `out_of_scope[]` | no estructurado (en rules/description) |
-| Reglas | `rules`/`rules_html` | `rulesOfEngagement.content.description` |
+| Scope OUT | `out_of_scope[]` | unstructured (in rules/description) |
+| Rules | `rules`/`rules_html` | `rulesOfEngagement.content.description` |
 | **User-Agent** | `user_agent` | `testingRequirements.userAgent` (+ `requestHeader`) |
-| Reward grid | `reward_grid_*` por severidad | ❌ no hay grid: solo `minBounty`/`maxBounty` + `tier` del dominio |
-| Severidad | `cvss`/`criticity` | ❌ no expuesta en el detalle (se asigna en submission) |
-| Mis reportes | `/user/reports` ✅ | **⛔ no existe** (ver arriba) |
-| Auth | JWT sesión corto (Bearer) | PAT larga duración (Bearer) |
+| Reward grid | `reward_grid_*` per severity | ❌ no grid: only `minBounty`/`maxBounty` + domain `tier` |
+| Severity | `cvss`/`criticity` | ❌ not exposed in the detail (assigned at submission) |
+| My reports | `/user/reports` ✅ | **⛔ does not exist** (see above) |
+| Auth | short-lived session JWT (Bearer) | long-lived PAT (Bearer) |
 
 ## Fixtures
 
-- `intigriti-swagger-v1.0.json` — spec OpenAPI completo (público).
-- `programs-page1.json` — item de lista anonimizado (bug bounty con bounty +
-  responsible disclosure sin bounty; types/status/confidentiality reales).
-- `program-detail.json` — detalle anonimizado con 3 dominios (wildcard
-  critical, url high, wildcard no-bounty), ROE completo con userAgent
-  requerido, requestHeader y safeHarbour.
+- `intigriti-swagger-v1.0.json` — full public OpenAPI spec.
+- `programs-page1.json` — anonymized list item (bug bounty with bounty +
+  responsible disclosure without bounty; real types/status/confidentiality).
+- `program-detail.json` — anonymized detail with 3 domains (wildcard
+  critical, url high, wildcard no-bounty), full ROE with required userAgent,
+  requestHeader and safeHarbour.
 
 ---
 
-## Vista bueno de la arquitectura para dos plataformas (anotado aquí)
+## Architecture notes for two platforms (recorded here)
 
-Aprobado el orden 1-4 con tres CONDICIONES obligatorias:
+Approved order 1-4 with three MANDATORY conditions:
 
-1. **Paso 1 = refactor puro** (adaptador YWH → modelo neutro): cero
-   comportamiento nuevo, los tests siguen en verde, la pantalla de YWH se
-   comporta exactamente igual. Cualquier cambio visual es un bug.
-2. **Modelo neutro NO lossy**: el `raw` de la plataforma se conserva SIEMPRE
-   en el modelo (raw junto al neutro) y la pestaña Programa debe poder
-   mostrar lo específico de cada plataforma aunque el modelo neutro no lo
-   tenga. Prohibido perder campos al pasar por el adaptador.
-3. **Paginación Intigriti**: por offset, limit hasta 500; paginar hasta
-   agotar `maxCount`, con el mismo pacing que YWH y un TOPE DE SEGURIDAD de
-   iteraciones por si `maxCount` es inconsistente (no entrar en bucle).
+1. **Step 1 = pure refactor** (YWH adapter → neutral model): zero new
+   behavior, tests stay green, the YWH screen behaves exactly the same. Any
+   visual change is a bug.
+2. **Neutral model is NOT lossy**: the platform `raw` payload is ALWAYS kept
+   in the model (raw alongside the neutral view) and the Program tab must be
+   able to show platform-specific fields even when the neutral model does not
+   carry them. Losing fields through the adapter is forbidden.
+3. **Intigriti pagination**: by offset, limit up to 500; paginate until
+   `maxCount` is exhausted, same pacing as YWH and a SAFETY CAP on iterations
+   in case `maxCount` is inconsistent (never loop forever).
 
-Además, anotado arriba como definitivo: **la API no expone submissions**.
+Also recorded above as final: **the API does not expose submissions**.
 
-Orden acordado: 1) adaptador YWH → neutro (refactor puro) · 2) módulo
-Intigriti (cliente+parsers+render propio) · 3) tokens (uno por plataforma) +
-Ajustes · 4) `/intigriti` maestro + crear proyecto con `platform.json`.
+Agreed order: 1) YWH adapter → neutral (pure refactor) · 2) Intigriti module
+(client+parsers+own render) · 3) tokens (one per platform) + Settings ·
+4) Intigriti master tab + create project with `platform.json`.

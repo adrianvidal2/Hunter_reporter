@@ -1,107 +1,97 @@
 # reporter
 
-App web **local** para gestionar reportes de bug bounty sobre una carpeta de
-ficheros ya existente. El sistema de ficheros es la verdad; todo lo demás es
-vista o índice reconstruible.
+Local web app for managing bug bounty reports over a pre-existing folder of
+files. The filesystem is the source of truth; everything else is a view or a
+rebuildable index.
 
-## Arranque
+## Startup
 
 ```bash
 pnpm install
-pnpm dev        # http://127.0.0.1:3100 (solo localhost)
+pnpm dev        # http://127.0.0.1:3100 (localhost only)
 ```
 
-Requiere Node 22 + pnpm. La configuración vive en `.env.local`:
+Requires Node 22 + pnpm. Configuration lives in `.env.local`:
 
-| Variable | Significado |
+| Variable | Meaning |
 |---|---|
-| `REPORTS_ROOT` | Carpeta raíz con los proyectos (`demo_project/REPORTES_YWH/*.pdf` + `demo_project/reportes/*.md`) |
-| `API_TOKEN` | Token `Bearer` de la API de ingesta (se genera con `openssl rand -hex 32`) |
+| `REPORTS_ROOT` | Root folder holding the projects (`demo_project/REPORTES_YWH/*.pdf` + `demo_project/reportes/*.md`) |
+| `API_TOKEN` | `Bearer` token for the ingestion API (generate with `openssl rand -hex 32`) |
 
-Si `REPORTS_ROOT` falta o no es válida, la app **no arranca** (falla al inicio
-con mensaje claro).
+If `REPORTS_ROOT` is missing or invalid, the app **refuses to start** (it fails
+at boot with a clear message).
 
-## Estructura requerida
+## Required structure
 
-El repo vive en `reporter-app/`; los **datos** (`reportes/`, hermano del repo)
-jamás se versionan (posible NDA). `.settings/` y `.env.local` (tokens y claves)
-tampoco: están en el `.gitignore`.
+The git repo is `reporter-app/`; **data** (`reportes/`, sibling of the repo) is
+never versioned (possible NDA). `.settings/` and `.env.local` (tokens and keys)
+are not either: both are in the `.gitignore`.
 
 ```
 proxectos/reporter/
-├── reporter.sh                  # arranque/gestión (fuera del repo)
-├── README.md                    # este + mapa de estructura (fuera del repo)
+├── reporter.sh                  # server management script (outside the repo)
+├── README.md                    # this + structure map (outside the repo)
 │
-├── reportes/                    ← REPORTS_ROOT (.env.local): JAMÁS en el repo
-│   ├── _inbox/                  # reportes sin proyecto (API de ingesta)
-│   ├── .config/                 # plantillas y prompts globales
-│   ├── .trash/ .history/        # papelera y copias previas a guardado
-│   └── <proyecto>/              # un directorio por programa (slug)
-│       ├── .config/platform.json    # plataforma (yeswehack|intigriti)
-│       ├── programa.json            # detalle del programa (GET plataforma)
+├── reportes/                    ← REPORTS_ROOT (.env.local): NEVER in the repo
+│   ├── _inbox/                  # reports without a project (ingestion API)
+│   ├── .config/                 # global templates and prompts
+│   ├── .trash/ .history/        # trash and pre-save backups
+│   └── <project>/               # one directory per program (slug)
+│       ├── .config/platform.json    # platform (yeswehack|intigriti)
+│       ├── programa.json            # program detail (platform GET)
 │       ├── pentest/
-│       │   ├── programa.md          # informe del programa (generado, editable)
-│   │   │   ├── recon/<tool>/<fecha>/  # salidas de recon + run.json
-│   │   │   └── launches.json        # histórico de lanzamientos de agentes
-│       ├── REPORTES_YWH/            # PDFs entregados (solo lectura en la app)
-│       └── reportes/                # borradores markdown (lo que editas)
+│       │   ├── programa.md          # program report (generated, editable)
+│       │   ├── recon/<tool>/<date>/ # recon outputs + run.json
+│       │   └── launches.json        # agent launch history
+│       ├── REPORTES_YWH/            # delivered PDFs (read-only in the app)
+│       └── reportes/                # markdown drafts (what you edit)
 │
-└── reporter-app/                ← el repo git: SOLO código
+└── reporter-app/                ← the git repo: CODE ONLY
     ├── src/
-    │   ├── app/                 # rutas Next (páginas + server actions + API)
-    │   │   ├── api/             # ingesta (v1), ficheros (raw), eventos (SSE)
-    │   │   ├── programas/       # explorador multiplataforma (YWH | Intigriti)
-    │   │   ├── escaneos/        # agentes + acciones del módulo recon
-    │   │   ├── cvss/            # calculadora CVSS 3.1
-    │   │   └── ajustes/         # LLM, tokens, rutas de binarios
-    │   ├── components/          # UI (editor, exploradores, panels)
-    │   ├── core/                # dominio puro, sin Next → aquí van los tests
-    │   │   ├── fs/              # paths seguros, tree, atomic, watcher, uploads
-    │   │   ├── reports/         # front-matter, plantillas
+    │   ├── app/                 # Next routes (pages + server actions + API)
+    │   │   ├── api/             # ingestion (v1), files (raw), events (SSE)
+    │   │   ├── programas/       # multi-platform explorer (YWH | Intigriti)
+    │   │   ├── escaneos/        # agents + recon module actions
+    │   │   ├── cvss/            # CVSS 3.1 calculator
+    │   │   └── ajustes/         # LLM, tokens, binary paths
+    │   ├── components/          # UI (editor, explorers, panels)
+    │   ├── core/                # pure domain, no Next → tests live here
+    │   │   ├── fs/              # safe paths, tree, atomic, watcher, uploads
+    │   │   ├── reports/         # front-matter, templates
     │   │   ├── llm/ ywh/ intigriti/ programs/ recon/ cvss/ orca/ prompts/ db/
-    │   ├── server/              # estado vivo de servidor (watcher, recon
-    │   │                        #   runner, orca, escaneos)
+    │   ├── server/              # live server state (watcher, recon runner,
+    │   │                        #   orca, scans)
     │   └── lib/                 # env, autosave, secrets (AES-256-GCM)
-    ├── docs/                    # contratos de API verificados + fixtures
-    ├── scripts/                 # migraciones (p. ej. platform.json)
-    ├── .env.local               # NUNCA en el repo
-    └── .settings/               # NUNCA en el repo (tokens/claves cifrados)
+    ├── docs/                    # verified API contracts + fixtures
+    ├── scripts/                 # migrations (e.g. platform.json)
+    ├── .env.local               # NEVER in the repo
+    └── .settings/               # NEVER in the repo (encrypted tokens/keys)
 ```
 
-Reglas: `reportes/` no se versiona (la app lo recrea si falta); el índice
-SQLite es reconstruible (`pnpm run db:reset`); los tests usan directorios
-temporales y jamás tocan `reportes/` real.
+Rules: `reportes/` is not versioned (the app recreates it if missing); the
+SQLite index is rebuildable (`pnpm run db:reset`); tests use temporary
+directories and never touch the real `reportes/`.
 
-## Qué hay
+## What's inside
 
-- **Explorador**: proyectos con contadores, PDFs entregados (visor propio con
-  paginación/zoom) y borradores markdown (editor CodeMirror + preview
-  sanitizada, autoguardado, historial `.history/`, papelera `.trash/`)
-- **API de ingesta** (`/api/v1/*`): tus scripts depositan reportes por HTTP
+- **Explorer**: projects with counters, delivered PDFs (dedicated viewer with
+  pagination/zoom, uploads via drag & drop) and markdown drafts (CodeMirror
+  editor + sanitized preview, autosave, `.history/` backups, `.trash/`)
+- **Ingestion API** (`/api/v1/*`, see `docs/api-ingesta.md`): your scripts
+  drop reports over HTTP; the watcher detects external files
+- **Pending reports**: human-in-the-loop approval before anything runs
+- **Report templates + LLM rewriting** (OpenAI-compatible providers) with
+  diff view and guardrails
+- **Multi-platform programs** (YesWeHack | Intigriti) over a neutral model;
+  tokens encrypted in `.settings/`
+- **CVSS 3.1 calculator** (FIRST spec, NIST-style UI)
+- **Recon**: launches whitelisted installed tools against program scope with
+  safe execution, risk levels and full run tracing
 
-## Recibir un reporte por API (copiable)
+## Multi-platform
 
-```bash
-API_TOKEN=$(grep '^API_TOKEN=' .env.local | cut -d= -f2)
-
-curl -s -X POST http://127.0.0.1:3100/api/v1/reports \
-  -H 'content-type: application/json' \
-  -H "Authorization: Bearer $API_TOKEN" \
-  -d '{"content":"# XSS reflejado en /buscar","filename":"xss-buscar","project":"demo_project"}'
-# → {"path":"demo_project/reportes/xss-buscar.md"}
-```
-
-Referencia completa de la API (campos, respuestas, códigos, ejemplos extra):
-**[docs/api-ingesta.md](docs/api-ingesta.md)**
-
-## Desarrollo
-
-```bash
-pnpm test        # suite completa (unit + integración, fixtures en tmpdir)
-pnpm build       # build de producción + type-check
-pnpm db:reset    # recrea el índice SQLite (reconstruible por diseño)
-```
-
-Estructura esencial: `src/core/` (núcleo puro, sin Next — ahí van los tests),
-`src/app/` (rutas y Server Actions), `src/db/` (índice Drizzle), `src/lib/`
-(utilidades). El plan de construcción detallado vive en `../PLAN.md`.
+YesWeHack and Intigriti share a neutral model (`core/programs/types.ts`): the
+platform raw payload always travels intact (no-lossy condition) and each
+platform has its own client, parsers, adapter and render under `core/`.
+Program sub-tabs and each project's Program/Recon tabs read the project's
+`platform.json` to know which platform they work with.

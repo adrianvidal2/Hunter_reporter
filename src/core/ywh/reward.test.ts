@@ -42,7 +42,7 @@ function makeProgram(patch: Partial<Program> = {}): Program {
 }
 
 describe('rewardRows (interpretación correcta: importes CVSS por asset value)', () => {
-  it('dato real de Demo: un asset HIGH → UNA fila con Low50/Med300/High700/Crit1000', () => {
+  it('dato real del fixture: un asset HIGH → UNA fila con Low50/Med300/High700/Crit1000', () => {
     const p = makeProgram({
       reward_grid_high: { bounty_low: 50, bounty_medium: 300, bounty_high: 700, bounty_critical: 1000 },
     })
