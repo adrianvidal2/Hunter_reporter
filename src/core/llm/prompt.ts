@@ -34,13 +34,22 @@ export const STYLE_RULES = `- Tono técnico y directo, sin adornos.
 /** Tags que se neutralizan si aparecen dentro del contenido del reporte. */
 const TAG_NAMES = ['PLANTILLA', 'REGLAS_ESTILO', 'REPORTE_ORIGINAL'] as const
 
+/**
+ * Neutraliza los cierres/aperturas de UN delimitador dentro de un contenido
+ * (&lt;/TAG&gt;): la capa anti-inyección reutilizable. `escapeDelimiters` la
+ * aplica a todos los tags de reescritura; otros prompts (triage de
+ * findings) la usan con su propio tag.
+ */
+export function escapeTag(tag: string, content: string): string {
+  return content
+    .replaceAll(`</${tag}>`, `&lt;/${tag}&gt;`)
+    .replaceAll(`<${tag}`, `&lt;${tag}`)
+}
+
 /** Escapa cierres literales de delimitadores dentro de un contenido. */
 export function escapeDelimiters(content: string): string {
   let out = content
-  for (const tag of TAG_NAMES) {
-    out = out.replaceAll(`</${tag}>`, `&lt;/${tag}&gt;`)
-    out = out.replaceAll(`<${tag}`, `&lt;${tag}`)
-  }
+  for (const tag of TAG_NAMES) out = escapeTag(tag, out)
   return out
 }
 

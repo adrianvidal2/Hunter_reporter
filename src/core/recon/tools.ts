@@ -372,6 +372,9 @@ export function buildToolCommands(
           '-l', file,
           '-c', '25',
           '-rl', '100',
+          // JSONL por línea: es lo que parsea el índice de findings
+          // (core/recon/findings.ts). Sin -json no habría estructura.
+          '-json',
           '-silent', '-no-color', '-nc',
           ...headerUa(opts),
         ],

@@ -11,9 +11,21 @@ import { programParser } from '@/core/ywh/types'
 import { programDetailParser } from '@/core/intigriti/types'
 import { readPlatformJson } from '@/core/programs/platform-file'
 import { parseHttpxHosts } from '@/core/recon/flows'
-import { getTool, RECON_TOOLS } from '@/core/recon/tools'
+import { getTool, RECON_TOOLS, type ReconRisk } from '@/core/recon/tools'
+import { planPipeline, type PipelineScopeShape, type PipelineStageSource } from '@/core/recon/pipeline'
+import { cancelPipeline, getPipeline, startPipeline, type PipelineSnapshot } from '@/server/recon-pipeline'
 import { loadReconSettings, saveReconSettings, resolveBinPath, type ReconSettings } from '@/core/recon/settings'
 import { getReconRunner, type ReconRunRecord } from '@/server/recon-runner'
+import { diffLatestReconRuns, type ReconDiffResult } from '@/server/recon-diff'
+import { rebuildFindingsFromDisk, listFindings } from '@/db/findings'
+import { classifyProjectFindings } from '@/server/classify-findings'
+import { DEFAULT_TEMPLATE } from '@/core/reports/templates'
+import { renderTemplate } from '@/core/reports/placeholders'
+import { writeAtomic } from '@/core/fs/atomic'
+import { sha256Content } from '@/core/fs/hash'
+import { InvalidFilenameError, sanitizeFilename } from '@/core/fs/sanitize'
+import { markOwnWrite } from '@/server/own-writes'
+import type { FindingSeverity } from '@/core/recon/findings'
 
 /**
  * Server Actions de la subpestana Recon (pestaña Escaneos del proyecto).
@@ -216,6 +228,14 @@ export async function listReconRunsAction(project: string): Promise<ReconRunReco
   return runs.sort((a, b) => b.startedAt.localeCompare(a.startedAt))
 }
 
+/**
+ * Diff de los dos runs más recientes de una herramienta: qué assets son
+ * NUEVOS respecto al run anterior. Solo lectura: sin gate (no lanza nada).
+ */
+export async function diffReconAction(project: string, toolId: string): Promise<ReconDiffResult> {
+  return diffLatestReconRuns(project, toolId, getEnv().REPORTS_ROOT)
+}
+
 /** Cola de salida (los últimos ~8 KB) de un run. */
 export async function getReconOutputAction(
   project: string,
@@ -236,6 +256,222 @@ export async function getReconOutputAction(
 export async function cancelReconAction(runId: string): Promise<{ ok: boolean; error?: string }> {
   const ok = getReconRunner().cancel(runId)
   return ok ? { ok: true } : { ok: false, error: 'Ese run ya no está activo en este servidor' }
+}
+
+/**
+ * Plan de pipeline PROPUESTO por el servidor según el scope actual del
+ * programa: la UI lo muestra con toggles; nada se lanza sin aprobación.
+ */
+export interface PipelineStageDTO {
+  toolId: string
+  label: string
+  risk: ReconRisk
+  source: PipelineStageSource
+  targets: string[]
+  extract: 'hosts' | 'urls' | 'none'
+  gated: boolean
+}
+
+export interface PipelinePlanDTO {
+  ok: boolean
+  reason?: string
+  stages?: PipelineStageDTO[]
+  shape?: PipelineScopeShape
+  /** Entradas del scope descartadas por forma inválida. */
+  ignored?: string[]
+}
+
+export async function planPipelineAction(project: string): Promise<PipelinePlanDTO> {
+  const context = await getReconContextAction(project)
+  if (!context.ok) return { ok: false, reason: context.error ?? 'Sin contexto de programa' }
+  const res = planPipeline(context.targets ?? [])
+  if (!res.ok) return { ok: false, reason: res.reason }
+  return {
+    ok: true,
+    stages: res.plan.stages.map((s) => ({
+      ...s,
+      label: getTool(s.toolId)?.label ?? s.toolId,
+      risk: getTool(s.toolId)?.risk ?? 'passive',
+    })),
+    shape: res.plan.shape,
+    ignored: res.plan.shape.invalid,
+  }
+}
+
+/**
+ * Lanza el pipeline con las etapas elegidas (el SERVIDOR recalcula el plan
+ * y valida el subconjunto). Devuelve enseguida: el estado se consulta con
+ * getPipelineStatusAction. El gate corta antes de lo activo/explotación.
+ */
+export async function startPipelineAction(
+  project: string,
+  stages: string[],
+  confirmed?: boolean,
+): Promise<{ ok: true; pipelineId: string } | { ok: false; error: string }> {
+  const context = await getReconContextAction(project)
+  if (!context.ok) return { ok: false, error: context.error ?? 'Sin contexto de programa' }
+  const res = startPipeline({
+    project,
+    scope: context.targets ?? [],
+    userAgent: context.userAgent,
+    rules: { rulesText: context.rulesText, automatedTooling: context.automatedTooling },
+    stages,
+    confirmed,
+  })
+  if (res.ok) revalidatePath(`/proyectos/${encodeURIComponent(project)}`)
+  return res
+}
+
+/** Estado del pipeline (null si no existe o el servidor se reinició). */
+export async function getPipelineStatusAction(pipelineId: string): Promise<PipelineSnapshot | null> {
+  return getPipeline(pipelineId)
+}
+
+export async function cancelPipelineAction(pipelineId: string): Promise<{ ok: boolean; error?: string }> {
+  const ok = cancelPipeline(pipelineId)
+  return ok ? { ok: true } : { ok: false, error: 'Ese pipeline ya no está activo en este servidor' }
+}
+
+// ── Findings (Tarea 3): índice reconstruible + borradores ──────────────
+
+export interface FindingDTO {
+  templateId: string
+  host: string
+  severity: FindingSeverity
+  name: string
+  matchedAt: string
+  toolId: string
+  runDir: string
+  firstSeenAt: string
+  lastSeenAt: string
+  // triaje LLM (Tarea 4): PRE-MARCA, el humano decide
+  triageLabel?: 'real' | 'ruido' | 'dudoso'
+  triageConfianza?: number
+  triageRazon?: string
+  triagedAt?: string
+}
+
+/**
+ * Sincroniza el índice de findings del proyecto DESDE EL DISCO (los
+ * output.log son la verdad; la tabla es reconstruible) y devuelve el
+ * listado agregado, del hallazgo más grave al más leve.
+ */
+export async function syncFindingsAction(
+  project: string,
+): Promise<{ ok: true; findings: FindingDTO[] } | { ok: false; error: string }> {
+  const root = getEnv().REPORTS_ROOT
+  if (!listProjects(root).includes(project)) {
+    return { ok: false, error: `No existe el proyecto: ${project}` }
+  }
+  try {
+    rebuildFindingsFromDisk(project, root)
+    const rows = listFindings(project)
+    return {
+      ok: true,
+      findings: rows.map((r) => ({
+        templateId: r.templateId,
+        host: r.host,
+        severity: r.severity as FindingSeverity,
+        name: r.name ?? r.templateId,
+        matchedAt: r.matchedAt ?? '',
+        toolId: r.toolId,
+        runDir: r.runDir,
+        firstSeenAt: r.firstSeenAt.toISOString(),
+        lastSeenAt: r.lastSeenAt.toISOString(),
+        triageLabel: r.triageLabel ?? undefined,
+        triageConfianza: r.triageConfianza ?? undefined,
+        triageRazon: r.triageRazon ?? undefined,
+        triagedAt: r.triagedAt?.toISOString(),
+      })),
+    }
+  } catch (err) {
+    return { ok: false, error: err instanceof Error ? err.message : 'Error inesperado sincronizando findings' }
+  }
+}
+
+export interface CreateFindingDraftResult {
+  ok: boolean
+  /** Ruta relativa del borrador creado (dentro de reportes/). */
+  path?: string
+  error?: string
+}
+
+/**
+ * Crea un BORRADOR .md en reportes/ del proyecto desde la plantilla por
+ * defecto rellenada con los datos del finding. Los placeholders sin dato
+ * quedan VISIBLES ({{clave}}) para que no se pierda nada en silencio. No
+ * pisa ficheros: si el nombre existe, sufijo -2, -3…
+ */
+export async function createFindingDraftAction(
+  project: string,
+  finding: { templateId: string; host: string; severity: string; matchedAt?: string; name?: string },
+): Promise<CreateFindingDraftResult> {
+  const root = getEnv().REPORTS_ROOT
+  if (!listProjects(root).includes(project)) {
+    return { ok: false, error: `No existe el proyecto: ${project}` }
+  }
+  if (finding.templateId.trim() === '' || finding.host.trim() === '') {
+    return { ok: false, error: 'El finding no tiene template ni host: no se puede crear el borrador' }
+  }
+
+  const title = finding.name?.trim() || finding.templateId
+  const content = renderTemplate(DEFAULT_TEMPLATE, {
+    titulo: title,
+    target: finding.host,
+    severidad: finding.severity,
+    fecha: new Date().toISOString().slice(0, 10),
+    hallazgo: title,
+  })
+
+  let base: string
+  try {
+    base = sanitizeFilename(`finding-${finding.templateId}-${finding.host}`).replace(/\.md$/i, '')
+  } catch (err) {
+    if (err instanceof InvalidFilenameError) return { ok: false, error: 'El nombre del borrador queda vacío tras sanitizar' }
+    throw err
+  }
+
+  let rel = ''
+  try {
+    for (let n = 1; n <= 999; n++) {
+      const candidate = `${project}/reportes/${base}${n === 1 ? '' : `-${n}`}.md`
+      if (!existsSync(resolveSafeAllowMissing(candidate, root))) {
+        rel = candidate
+        break
+      }
+    }
+  } catch (err) {
+    if (err instanceof PathEscapeError) return { ok: false, error: err.message }
+    throw err
+  }
+  if (rel === '') return { ok: false, error: 'No se encontró un nombre libre para el borrador' }
+
+  try {
+    writeAtomic(rel, content, { root })
+    // escrito por la app: el watcher NO debe mandarlo a Pendientes
+    markOwnWrite(resolveSafe(rel, root), sha256Content(content))
+  } catch (err) {
+    if (err instanceof PathEscapeError) return { ok: false, error: err.message }
+    return { ok: false, error: err instanceof Error ? err.message : 'No se pudo escribir el borrador' }
+  }
+  revalidatePath(`/proyectos/${encodeURIComponent(project)}`)
+  return { ok: true, path: rel }
+}
+
+/**
+ * Triaje LLM de los findings del proyecto (Tarea 4): PRE-marca cada
+ * finding ('real'|'ruido'|'dudoso') sin borrar nada; queda registrado en
+ * llm_runs. A botón, por lotes; el humano decide después.
+ */
+export async function classifyFindingsAction(project: string): Promise<{
+  ok: boolean
+  error?: string
+  prefiltro?: number
+  sent?: number
+  marked?: number
+  labels?: { real: number; ruido: number; dudoso: number }
+}> {
+  return classifyProjectFindings(project)
 }
 
 /** Reclasifica huérfanos y devuelve los que siguen vivos (para la UI). */
