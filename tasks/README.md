@@ -34,3 +34,4 @@ idempotencia y el camino feliz. Nada se marca como hecho con tests en rojo o par
 | 6b | Página «Conocimiento» (UI + actions) | ⬜ pendiente (dep. 6a) |
 | 6c | Consumidor agentes (adjuntar `tecnica` al prompt) | ⬜ pendiente (dep. 6a) |
 | 6d | Consumidor reportes (insertar `reporte`) | ⬜ pendiente (dep. 6a) |
+| 6e | Recuperación KB (FTS5 sobre `reporter.db`) | ⬜ pendiente (dep. 6a; estudio: `docs/kb-retrieval-study.md`) |
