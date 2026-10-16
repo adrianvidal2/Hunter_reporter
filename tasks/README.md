@@ -41,3 +41,14 @@ idempotencia y el camino feliz. Nada se marca como hecho con tests en rojo o par
 | 7c | Secretos accionables en JS | ✅ hecho (reglas + entropía + filtro ruido + integración harvest/secrets.json + 14 tests; validación final pendiente) |
 | 7d | Primitivas + hipótesis (validador LLM → KB) | ✅ hecho (pre-filtro determinista + LLM leads + KB proyecto + 15 tests; validación final pendiente) |
 | 7e | Semilla de misión + handoff al agente | ✅ hecho (mission.ts + buildMissionAction + botón en wizard + 9 tests; validación final pendiente) |
+| 8 | **Conectar la KB** — epic (searchKb en triaje/reportes + feedback loop) | ✅ hecho (8a–8c completadas; validación final pendiente) |
+| 8a | searchKb en el triaje | ✅ hecho (rebuild+searchKb → bloque KB_CONTEXTO blindado + 4 tests; validación final pendiente) |
+| 8b | searchKb en la reescritura | ✅ hecho (auto-recuperación FTS5 + unión sin duplicar + 3 tests; validación final pendiente) |
+| 8c | Feedback: promover a KB (humano) | ✅ hecho (promoteToKbAction + searchKbAction + botón en findings + 5 tests; validación final pendiente) |
+| 9 | **Monitorización continua** — epic (recon pasivo en schedule → diff → aviso) | ✅ hecho (9a–9c completadas; validación final pendiente) |
+| 9a | Scheduler de recon pasivo (opt-in, solo pasivo/ligero) | ✅ hecho (schedule.ts + singleton + 17 tests; validación final pendiente) |
+| 9b | Diff automático → novedades + SSE | ✅ hecho (recon_news + diff por ciclo + broadcast + 7 tests; validación final pendiente) |
+| 9c | Vista de novedades | ✅ hecho (/novedades + actions + panel SSE + 5 tests; validación final pendiente) |
+| 10 | **Correlación cross-proyecto** — epic (SQL sobre findings) | ✅ hecho (10a–10b completadas; validación final pendiente) |
+| 10a | Queries de correlación | ✅ hecho (correlation.ts read-only + 7 tests; validación final pendiente) |
+| 10b | Vista de correlación | ✅ hecho (/correlacion read-only + sidebar; validación final pendiente) |
