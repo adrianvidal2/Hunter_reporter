@@ -1,4 +1,4 @@
-import { mkdirSync, readFileSync, writeFileSync } from 'node:fs'
+import { existsSync, mkdirSync, readFileSync, writeFileSync } from 'node:fs'
 import path from 'node:path'
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 import { createFixture, type Fixture } from '../../../test/fixtures/fixture'
@@ -25,7 +25,7 @@ vi.mock('@/core/orca/runner', () => ({
   },
 }))
 
-import { launchOrcaAction, launchProgramAction, renderKbContextAction } from './launch'
+import { buildMissionAction, launchOrcaAction, launchProgramAction, renderKbContextAction } from './launch'
 import { createKb } from '@/core/kb/kb'
 
 /** Escribe un programa.json realista en el proyecto del fixture. */
@@ -273,6 +273,76 @@ describe('renderKbContextAction (skills KB para el wizard Lanzar, Tarea 6c)', ()
     // [] → cadena vacía
     const empty = await renderKbContextAction([], 'demo_project')
     expect(empty.ok && empty.context).toBe('')
+    fx.cleanup()
+  })
+})
+
+describe('buildMissionAction (semilla de misión 7e: ensamblar ≠ ejecutar)', () => {
+  it('ensambla OpenAPI + gaps + secretos + jsSinMap + scope; y NO lanza nada', async () => {
+    const fx = createFixture()
+    env.root = fx.root
+    writeProgramJson(fx)
+    const harvestRel = 'demo_project/pentest/recon/js/20260101-000000'
+    const harvestAbs = path.join(fx.root, harvestRel)
+    mkdirSync(harvestAbs, { recursive: true })
+    writeFileSync(path.join(harvestAbs, 'openapi.json'), JSON.stringify({ paths: { '/api/v1/users/{id}': { get: {} } } }))
+    writeFileSync(path.join(harvestAbs, 'gaps.json'), JSON.stringify({ gaps: [{ reason: 'dynamic-template', snippet: 'fetch(`/api/${id}`)' }] }))
+    writeFileSync(path.join(harvestAbs, 'secrets.json'), JSON.stringify({ findings: [{ kind: 'aws-access-key', confidence: 'candidato', value: 'AKIAQWMHXN3FAKEKEY99' }] }))
+    writeFileSync(path.join(harvestAbs, 'coverage.json'), JSON.stringify({ coverage: [{ url: 'https://app.ejemplo.com/app.min.js', status: 'no-map' }] }))
+
+    const res = await buildMissionAction('demo_project')
+    expect(res.ok).toBe(true)
+    expect(res.harvestDirRel).toBe(harvestRel)
+    const mission = res.mission!
+    expect(mission).toContain('/api/v1/users/{id}')
+    expect(mission).toContain('fetch(`/api/${id}`)') // hueco dinámico señalado
+    expect(mission).toContain('[js-sin-sourcemap]') // hueco de cobertura señalado
+    expect(mission).toContain('AKIAQWMHXN3FAKEKEY99')
+    expect(mission).toContain('https://a.test') // scope desde programa.json
+
+    // ensamblar ≠ ejecutar: NADA se lanzó (sin launches.json)
+    expect(existsSync(path.join(fx.root, 'demo_project/pentest/launches.json'))).toBe(false)
+    fx.cleanup()
+  })
+
+  it('auto-descubre el harvest más RECIENTE que tenga openapi.json; las hipótesis salen de la KB', async () => {
+    const fx = createFixture()
+    env.root = fx.root
+    writeProgramJson(fx)
+    const oldDir = path.join(fx.root, 'demo_project/pentest/recon/js/20260101-000000')
+    const newDir = path.join(fx.root, 'demo_project/pentest/recon/js/20260102-000000')
+    mkdirSync(oldDir, { recursive: true })
+    mkdirSync(newDir, { recursive: true })
+    writeFileSync(path.join(oldDir, 'openapi.json'), JSON.stringify({ paths: { '/old': { get: {} } } }))
+    writeFileSync(path.join(newDir, 'openapi.json'), JSON.stringify({ paths: { '/new': { get: {} } } }))
+    // hipótesis de 07d ya persistidas en la KB del proyecto
+    createKb(
+      {
+        name: 'js-bola-1-20260102-1200-ab12',
+        description: 'Hipótesis LLM (bola) — lead sin confirmar (07d)',
+        category: 'tecnica',
+        tags: ['js-audit', 'bola', 'lead'],
+        body: '## Hipótesis: BOLA en /new\n\n- Lead best-effort.',
+      },
+      { scope: 'demo_project', root: fx.root },
+    )
+
+    const res = await buildMissionAction('demo_project')
+    expect(res.ok).toBe(true)
+    expect(res.harvestDirRel).toContain('20260102-000000')
+    expect(res.mission).toContain('/new')
+    expect(res.mission).toContain('Hipótesis: BOLA en /new') // desde la KB de 07d
+    expect(res.mission).not.toContain('"/old"')
+    fx.cleanup()
+  })
+
+  it('sin harvest → error claro', async () => {
+    const fx = createFixture()
+    env.root = fx.root
+    writeProgramJson(fx)
+    const res = await buildMissionAction('demo_project')
+    expect(res.ok).toBe(false)
+    expect(res.error).toMatch(/harvest/i)
     fx.cleanup()
   })
 })

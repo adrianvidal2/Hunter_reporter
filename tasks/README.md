@@ -35,3 +35,9 @@ idempotencia y el camino feliz. Nada se marca como hecho con tests en rojo o par
 | 6c | Consumidor agentes (adjuntar `tecnica` al prompt) | ✅ hecho (sección Conocimiento en wizard + applyKbToPrompt + renderKbContextAction + 5 tests; validación final pendiente) |
 | 6d | Consumidor reportes (insertar `reporte`) | ✅ hecho (selector en reescritura + bloque CONOCIMIENTO_KB blindado + 8 tests; validación final pendiente) |
 | 6e | Recuperación KB (FTS5 sobre `reporter.db`) | ✅ hecho (migración FTS5 + rebuild/search BM25 + 13 tests; validación final pendiente) |
+| 7 | **Auditoría guiada por reconstrucción de JS** — epic (A determinista + B agente, por relevo) | ✅ hecho (7a–7e completadas; validación final pendiente) |
+| 7a | Recolección JS + reconstrucción de sourcemaps | ✅ hecho (núcleo puro + harvest con coverage + 18 tests; validación final pendiente) |
+| 7b | Endpoints/params → OpenAPI (+ huecos) | ✅ hecho (extractor puro + openapi.json/gaps.json en harvest + 10 tests; validación final pendiente) |
+| 7c | Secretos accionables en JS | ✅ hecho (reglas + entropía + filtro ruido + integración harvest/secrets.json + 14 tests; validación final pendiente) |
+| 7d | Primitivas + hipótesis (validador LLM → KB) | ✅ hecho (pre-filtro determinista + LLM leads + KB proyecto + 15 tests; validación final pendiente) |
+| 7e | Semilla de misión + handoff al agente | ✅ hecho (mission.ts + buildMissionAction + botón en wizard + 9 tests; validación final pendiente) |

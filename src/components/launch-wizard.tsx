@@ -3,7 +3,7 @@
 import { useEffect, useMemo, useRef, useState, useTransition } from 'react'
 import type { PromptMeta } from '@/core/prompts/prompts'
 import { createPromptAction } from '@/app/prompts/actions'
-import { launchOrcaAction, renderKbContextAction } from '@/app/proyectos/[project]/launch'
+import { buildMissionAction, launchOrcaAction, renderKbContextAction } from '@/app/proyectos/[project]/launch'
 import type { KbIndexEntry } from '@/core/kb/kb'
 import type { Program } from '@/core/ywh/types'
 import {
@@ -149,6 +149,28 @@ export function LaunchWizard({ project, program, prompts, kbEntries = [], onClos
       } else {
         setError(res.error ?? 'No se pudo guardar.')
       }
+    })
+  }
+
+  /** Semilla de misión (7e): ensambla el prompt con OpenAPI/primitivas/huecos. ENSAMBLAR ≠ EJECUTAR. */
+  const loadMission = () => {
+    setError(null)
+    setSaveNote(null)
+    startTransition(async () => {
+      const res = await buildMissionAction(project)
+      if (!res.ok) {
+        setError(res.error ?? 'No se pudo cargar la misión.')
+        return
+      }
+      if (distinctPrompts) {
+        const perLabel: Record<string, string> = {}
+        for (const a of agents) perLabel[a.label] = res.mission!
+        setPromptByLabel((prev) => ({ ...perLabel, ...prev }))
+      } else {
+        setPromptText(res.mission!)
+      }
+      setPromptSlug(null)
+      setSaveNote(`Misión JS ensamblada desde ${res.harvestDirRel}. Revísala y lanza cuando quieras: nada se ha ejecutado.`)
     })
   }
 
@@ -427,15 +449,26 @@ export function LaunchWizard({ project, program, prompts, kbEntries = [], onClos
               <div>
                 <div className="flex items-center justify-between gap-2">
                   <h3 className="text-sm font-semibold">Prompt (compartido por todos los agentes)</h3>
-                  <button
-                    type="button"
-                    onClick={saveAs}
-                    disabled={pending || promptText.trim() === ''}
-                    className="rounded-md border border-zinc-300 px-2.5 py-1 text-xs hover:bg-zinc-100 disabled:opacity-40 dark:border-zinc-700 dark:hover:bg-zinc-900"
-                    title="Guarda este texto como un prompt NUEVO en la biblioteca (no pisa el original)"
-                  >
-                    Guardar como…
-                  </button>
+                  <div className="flex shrink-0 gap-2">
+                    <button
+                      type="button"
+                      onClick={loadMission}
+                      disabled={pending}
+                      title="Ensambla la misión con OpenAPI/primitivas/secretos/huecos del último harvest de JS (no ejecuta nada)"
+                      className="rounded-md border border-zinc-300 px-2.5 py-1 text-xs hover:bg-zinc-100 disabled:opacity-40 dark:border-zinc-700 dark:hover:bg-zinc-900"
+                    >
+                      Cargar misión JS (recon)
+                    </button>
+                    <button
+                      type="button"
+                      onClick={saveAs}
+                      disabled={pending || promptText.trim() === ''}
+                      className="rounded-md border border-zinc-300 px-2.5 py-1 text-xs hover:bg-zinc-100 disabled:opacity-40 dark:border-zinc-700 dark:hover:bg-zinc-900"
+                      title="Guarda este texto como un prompt NUEVO en la biblioteca (no pisa el original)"
+                    >
+                      Guardar como…
+                    </button>
+                  </div>
                 </div>
                 <select
                   value={promptSlug ?? ''}
