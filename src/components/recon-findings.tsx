@@ -1,6 +1,7 @@
 'use client'
 
 import { useEffect, useState } from 'react'
+import { promoteToKbAction } from '@/app/kb/actions'
 import {
   classifyFindingsAction,
   createFindingDraftAction,
@@ -93,8 +94,35 @@ export function ReconFindingsSection({ project }: { project: string }) {
       severity: f.severity,
       matchedAt: f.matchedAt,
       name: f.name,
-    }).then((res) => {
+    }).then((res: { ok: boolean; path?: string; error?: string }) => {
       setNote(res.ok ? { ok: true, msg: `Borrador creado: ${res.path}` } : { ok: false, msg: `✗ ${res.error}` })
+    })
+  }
+
+  /** Feedback loop (08c): promover un finding a la KB DEL PROYECTO (humano). */
+  const promote = (f: FindingDTO) => {
+    setNote(null)
+    void promoteToKbAction(
+      project,
+      {
+        title: `${f.templateId}-en-${f.host}`,
+        body: [
+          `## Finding promovido: ${f.name}`, '',
+          `- **Template:** ${f.templateId}  `, 
+          `- **Host:** ${f.host}  `,
+          `- **Severidad:** ${f.severity}  `,
+          `- **Match:** ${f.matchedAt || '—'}  `,
+          `- **Visto:** ${f.lastSeenAt.slice(0, 10)}`, '',
+          '> Confirmado manualmente desde la tabla de findings (recon).',
+        ].join('\n'),
+        category: 'tecnica',
+        tags: ['finding', f.severity],
+        source: 'finding',
+        sourceRef: `finding:${f.templateId}@${f.host}`,
+      },
+      project,
+    ).then((res: { ok: boolean; slug?: string; error?: string }) => {
+      setNote(res.ok ? { ok: true, msg: `⬆️ Promovido a la KB del proyecto: ${res.slug}` } : { ok: false, msg: `✗ ${res.error}` })
     })
   }
 
@@ -197,13 +225,23 @@ export function ReconFindingsSection({ project }: { project: string }) {
                   <td className="max-w-72 truncate py-1.5 pr-2 font-mono" title={f.matchedAt}>{f.matchedAt || '—'}</td>
                   <td className="py-1.5 pr-2 text-zinc-500 dark:text-zinc-400">{f.lastSeenAt.slice(0, 10)}</td>
                   <td className="py-1.5">
-                    <button
-                      type="button"
-                      onClick={() => createDraft(f)}
-                      className="rounded-md border border-zinc-300 px-2 py-0.5 hover:bg-zinc-50 dark:border-zinc-700 dark:hover:bg-zinc-900"
-                    >
-                      Crear borrador
-                    </button>
+                    <div className="flex gap-1.5">
+                      <button
+                        type="button"
+                        onClick={() => createDraft(f)}
+                        className="rounded-md border border-zinc-300 px-2 py-0.5 hover:bg-zinc-50 dark:border-zinc-700 dark:hover:bg-zinc-900"
+                      >
+                        Crear borrador
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => promote(f)}
+                        title="Promueve este finding a la KB del proyecto (feedback loop 08c; acción humana explícita)"
+                        className="rounded-md border border-emerald-300 px-2 py-0.5 text-emerald-700 hover:bg-emerald-50 dark:border-emerald-800 dark:text-emerald-400 dark:hover:bg-emerald-950"
+                      >
+                        Promover a KB
+                      </button>
+                    </div>
                   </td>
                 </tr>
               ))}

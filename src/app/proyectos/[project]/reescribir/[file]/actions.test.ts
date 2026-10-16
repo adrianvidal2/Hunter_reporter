@@ -117,7 +117,7 @@ describe('generateDraftRewriteAction (10.1)', () => {
     }
   })
 
-  it('los slugs KB marcados llegan como kbContext al LLM; sin marcar → sin contexto (6d)', async () => {
+  it('los slugs KB marcados llegan como kbContext al LLM; sin marcar → auto-contexto (6d+08b)', async () => {
     saveTemplate('alt', '# ALT\n\n## Executive Summary\n\n{{resumen}}', fx.root, 'demo_project')
     await createKb(
       {
@@ -142,7 +142,7 @@ describe('generateDraftRewriteAction (10.1)', () => {
     ]
     expect(withKb.kbContext).toContain('CUERPO-KB-REMEDIATION')
 
-    // sin marcar → SIN contexto: la reescritura es la de siempre
+    // sin marcar (08b): la AUTO-recuperación FTS5 trae la entrada relevante
     vi.mocked(rewriteReport).mockClear()
     await generateDraftRewriteAction(REL, 'alt')
     const [, , withoutKb] = vi.mocked(rewriteReport).mock.calls[0] as unknown as [
@@ -150,6 +150,117 @@ describe('generateDraftRewriteAction (10.1)', () => {
       string,
       { kbContext?: string },
     ]
-    expect(withoutKb.kbContext).toBe('')
+    expect(withoutKb.kbContext).toContain('CUERPO-KB-REMEDIATION')
+  })
+})
+
+describe('auto-contexto KB en la reescritura (08b: searchKb + unión sin duplicar)', () => {
+  beforeEach(() => {
+    vi.mocked(rewriteReport).mockClear()
+    const fx = createFixture()
+    env.root = fx.root
+    process.env.DB_PATH = path.join(fx.root, 'index.db')
+    saveTemplate('alt', '# ALT\n\n## Executive Summary\n\n{{resumen}}', fx.root, 'demo_project')
+    return () => {
+      delete process.env.DB_PATH
+      fx.cleanup()
+    }
+  })
+
+  it('recupera entradas reporte relevantes SIN selección manual y las pasa como kbContext', async () => {
+    await createKb(
+      {
+        name: 'auto-remediation-idor',
+        description: 'Remediación de IDOR: comparar objetos entre usuarios.',
+        category: 'reporte',
+        body: 'CUERPO-AUTO-REMEDIATION-IDOR',
+      },
+      { scope: 'demo_project', root: env.root },
+    )
+    vi.mocked(rewriteReport).mockResolvedValue({
+      ok: true,
+      markdown: '# R\n\n## Executive Summary\n\nx',
+      info: { attempts: 1, latencyMs: 5, model: 'test-model' },
+    })
+
+    // SIN kbSlugs manuales: la auto-recuperación hace el trabajo
+    await generateDraftRewriteAction(REL, 'alt')
+    const [,, opts] = vi.mocked(rewriteReport).mock.calls[0] as unknown as [
+      string,
+      string,
+      { kbContext?: string },
+    ]
+    expect(opts.kbContext).toContain('CUERPO-AUTO-REMEDIATION-IDOR')
+  })
+
+  it('une manual + auto SIN duplicar; sin hits ni selección → kbContext vacío', async () => {
+    // 'both' coincide con la query del reporte (heading IDOR) Y va marcado a mano
+    await createKb(
+      {
+        name: 'both-entry',
+        description: 'Remediación IDOR duplicada a propósito.',
+        category: 'reporte',
+        body: 'CUERPO-BOTH-ENTRY',
+      },
+      { scope: 'demo_project', root: env.root },
+    )
+    await createKb(
+      {
+        name: 'manual-entry',
+        description: 'Entrada elegida a mano que NO coincide con la query.',
+        category: 'reporte',
+        body: 'CUERPO-MANUAL-ENTRY',
+      },
+      { scope: 'demo_project', root: env.root },
+    )
+    vi.mocked(rewriteReport).mockResolvedValue({
+      ok: true,
+      markdown: '# R\n\n## Executive Summary\n\nx',
+      info: { attempts: 1, latencyMs: 5, model: 'test-model' },
+    })
+
+    await generateDraftRewriteAction(REL, 'alt', ['both-entry', 'manual-entry'])
+    const [,, opts] = vi.mocked(rewriteReport).mock.calls[0] as unknown as [
+      string,
+      string,
+      { kbContext?: string },
+    ]
+    expect(opts.kbContext).toContain('CUERPO-BOTH-ENTRY')
+    expect(opts.kbContext).toContain('CUERPO-MANUAL-ENTRY')
+    // sin duplicar: el cuerpo de 'both' aparece UNA sola vez
+    expect(opts.kbContext!.match(/CUERPO-BOTH-ENTRY/g)).toHaveLength(1)
+
+    // sin hits ni selección (KB sin entradas que casen): SIN bloque
+    vi.mocked(rewriteReport).mockClear()
+    await generateDraftRewriteAction(REL, 'alt', ['manual-entry'])
+    const [,, solo] = vi.mocked(rewriteReport).mock.calls[0] as unknown as [
+      string,
+      string,
+      { kbContext?: string },
+    ]
+    expect(solo.kbContext).toContain('CUERPO-MANUAL-ENTRY')
+  })
+
+  it('buildReportKbQuery: identificadores y títulos primero; stopwords y vacío fuera', async () => {
+    const { buildReportKbQuery } = await import('@/server/generate-rewrite')
+    const report = [
+      '---',
+      'title: "IDOR en panel de administración"',
+      '---',
+      '# IDOR en panel',
+      '',
+      '## Executive Summary',
+      '',
+      'Referencia CVE-2024-1234 y CWE-639.',
+    ].join('\n')
+    const query = buildReportKbQuery(report)
+    expect(query.toLowerCase()).toContain('cve-2024-1234')
+    expect(query.toLowerCase()).toContain('cwe-639')
+    expect(query).toContain('idor')
+    expect(query).toContain('panel')
+    // stopwords fuera
+    expect(query.toLowerCase()).not.toMatch(/\bsummary\b/)
+    expect(query.toLowerCase()).not.toMatch(/\bexecutive\b/)
+    expect(buildReportKbQuery('')).toBe('')
   })
 })

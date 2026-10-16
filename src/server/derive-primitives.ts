@@ -4,9 +4,10 @@ import { getEnv } from '@/lib/env'
 import { resolveSafe } from '@/core/fs/paths'
 import { chatCompletion, LlmApiError } from '@/core/llm/client'
 import { loadLlmSettings } from '@/core/llm/settings'
-import { createKb } from '@/core/kb/kb'
+import { createKb, loadKbEntry } from '@/core/kb/kb'
 import type { JsEndpoint, JsEndpointGap } from '@/core/recon/js-endpoints'
 import {
+  buildKbQuery,
   buildPrimitivesPrompt,
   deriveDeterministicPrimitives,
   parseHypotheses,
@@ -14,6 +15,7 @@ import {
   type Hypothesis,
   type PrimitivesPromptData,
 } from '@/core/recon/primitives'
+import { rebuildKbIndex, searchKb } from '../db/kb-index'
 import { recordLlmRun } from '@/db/runs'
 
 /**
@@ -149,11 +151,30 @@ export async function derivePrimitivesFor(input: DerivePrimitivesInput): Promise
   let llmError: string | undefined
 
   if (settings && settings.apiKey) {
+    // 08a — recuperar KB 'tecnica' relevante ANTES de juzgar (léxico-primero,
+    // FTS5). El índice es reconstruible: se refresca justo antes de buscar.
+    // La recuperación NUNCA bloquea el triaje: cualquier fallo → sin contexto.
+    let kbContext = ''
+    try {
+      rebuildKbIndex(root, dbPath)
+      const query = buildKbQuery(artifacts)
+      if (query !== '') {
+        const hits = searchKb(query, { project: input.project, category: 'tecnica', limit: 5, root, dbPath })
+        kbContext = hits
+          .map((h) => loadKbEntry(h.slug, { project: input.project, root }).body)
+          .filter((b) => b.trim() !== '')
+          .join('\n\n')
+      }
+    } catch {
+      kbContext = ''
+    }
+
     const promptData: PrimitivesPromptData = {
       endpoints: artifacts.endpoints,
       gaps: artifacts.gaps,
       secrets: artifacts.secrets,
       deterministic,
+      kbContext,
     }
     const { system, user } = buildPrimitivesPrompt(promptData)
     const sleep = input.sleepImpl ?? ((ms: number) => new Promise((r) => setTimeout(r, ms)))

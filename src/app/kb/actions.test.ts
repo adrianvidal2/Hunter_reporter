@@ -10,11 +10,14 @@ vi.mock('next/cache', () => ({ revalidatePath: vi.fn() }))
 import {
   createKbAction,
   deleteKbAction,
+  promoteToKbAction,
+  searchKbAction,
   listKbAction,
   loadKbEntryAction,
   readKbReferenceAction,
   updateKbAction,
 } from './actions'
+import { loadKbEntry } from '@/core/kb/kb'
 
 const root = mkdtempSync(join(tmpdir(), 'kb-actions-'))
 afterAll(() => rmSync(root, { recursive: true, force: true }))
@@ -122,5 +125,62 @@ describe('deleteKbAction (a .trash) y loadKbEntryAction', () => {
 
     const ghost = await loadKbEntryAction('fantasma')
     expect(ghost).toMatchObject({ ok: false, error: expect.stringMatching(/No existe/) })
+  })
+})
+
+describe('promoteToKbAction (feedback loop 08c: SOLO acción humana)', () => {
+  const PAYLOAD = {
+    title: 'sqli-users-endpoint',
+    body: '## Primitiva confirmada\n\nGET /api/v1/users con id secuencial: BOLA verificada manualmente.',
+    category: 'tecnica' as const,
+    tags: ['sqli'],
+    source: 'finding',
+    sourceRef: 'finding:sql-injection@api.ejemplo.com',
+  }
+
+  it('antes de promover la KB está vacía; el único camino es la acción explícita', async () => {
+    expect(await listKbAction()).toMatchObject({ ok: true, data: [] })
+    expect(await listKbAction('demo')).toMatchObject({ ok: true, data: [] })
+  })
+
+  it('promover crea la entrada con scope/categoría/tags/cuerpo y trazabilidad', async () => {
+    const res = await promoteToKbAction('demo', PAYLOAD, 'demo')
+    expect(res.ok).toBe(true)
+    const loaded = loadKbEntry(res.ok ? res.data.slug : '', { project: 'demo', root: env.root })
+    expect(loaded.slug).toBe('sqli-users-endpoint')
+    expect(loaded.category).toBe('tecnica')
+    expect(loaded.tags).toContain('promovido')
+    expect(loaded.tags).toContain('origen:finding')
+    expect(loaded.tags).toContain('sqli')
+    expect(loaded.body).toContain('Promovido a KB manualmente (08c)')
+    expect(loaded.body).toContain('finding:sql-injection@api.ejemplo.com')
+    expect(loaded.body).toContain('BOLA verificada manualmente')
+  })
+
+  it('colisión de slug → sufijo automático (promover dos veces no es error)', async () => {
+    const first = await promoteToKbAction('demo', PAYLOAD, 'demo')
+    const second = await promoteToKbAction('demo', PAYLOAD, 'demo')
+    expect(first.ok && second.ok).toBe(true)
+    expect(second.ok && second.data.slug).toBe('sqli-users-endpoint-2')
+    const idx = await listKbAction('demo')
+    expect(idx.ok && idx.data).toHaveLength(2)
+  })
+
+  it('scope global también funciona; scope inexistente y payload vacío → error', async () => {
+    const g = await promoteToKbAction('demo', { ...PAYLOAD, title: 'global-entry' }, 'global')
+    expect(g.ok).toBe(true)
+    const badScope = await promoteToKbAction('demo', { ...PAYLOAD, title: 'x-1' }, 'no-existe')
+    expect(badScope).toMatchObject({ ok: false, error: expect.stringMatching(/No existe el proyecto/) })
+    const empty = await promoteToKbAction('demo', { ...PAYLOAD, title: '', body: '' }, 'demo')
+    expect(empty).toMatchObject({ ok: false, error: expect.stringMatching(/vacía/) })
+  })
+
+  it('tras promover (y reindexar), searchKbAction la encuentra', async () => {
+    process.env.DB_PATH = join(env.root, 'index.db')
+    await promoteToKbAction('demo', { ...PAYLOAD, body: 'Marcador unico para FTS-SEARCH-08C' }, 'demo')
+    const res = await searchKbAction('FTS-SEARCH-08C', { project: 'demo', category: 'tecnica' })
+    expect(res.ok).toBe(true)
+    expect(res.ok && res.data.map((h) => h.slug)).toContain('sqli-users-endpoint')
+    delete process.env.DB_PATH
   })
 })
