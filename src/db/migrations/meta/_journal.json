@@ -43,6 +43,13 @@
       "when": 1792094687578,
       "tag": "0005_kb_fts",
       "breakpoints": true
+    },
+    {
+      "idx": 6,
+      "version": "6",
+      "when": 1792182764124,
+      "tag": "0006_recon_news",
+      "breakpoints": true
     }
   ]
 }

@@ -21,6 +21,7 @@ import { peekOwnWrite } from './own-writes'
 export type SsePayload =
   | { type: 'count'; count: number }
   | { type: 'pending'; path: string; outcome: 'inserted' | 'updated' | 'noop' }
+  | { type: 'recon-news'; project: string; total: number }
 
 export interface WatcherService {
   /** Suscribe; emite inmediatamente el contador actual. Deviene unsubscribe. */
@@ -29,6 +30,8 @@ export interface WatcherService {
   ready: Promise<void>
   /** Reemite el contador a los suscriptores (para las Server Actions). */
   readonly broadcastCount: () => void
+  /** Emite un payload arbitrario del canal (p. ej. novedades de recon, 9b). */
+  emit(payload: SsePayload): void
   close(): Promise<void>
 }
 
@@ -103,6 +106,14 @@ export function notifyPendingCount(root: string = getEnv().REPORTS_ROOT): void {
   globalStore.__reporterWatcherServices?.get(root)?.broadcastCount()
 }
 
+/** Emite novedades de recon por el canal SSE, SOLO si el servicio existe. */
+export function notifyReconNews(
+  root: string,
+  payload: { project: string; total: number },
+): void {
+  globalStore.__reporterWatcherServices?.get(root)?.emit({ type: 'recon-news', ...payload })
+}
+
 function createService(
   root: string,
   dbPath: string,
@@ -121,6 +132,9 @@ function createService(
     ready: watcher.ready,
     get broadcastCount() {
       return broadcastCount
+    },
+    emit(payload: SsePayload) {
+      broadcast(payload)
     },
     subscribe(cb) {
       subscribers.add(cb)

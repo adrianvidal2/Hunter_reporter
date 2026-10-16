@@ -135,3 +135,32 @@ export const findings = sqliteTable(
 )
 
 export type FindingRow = typeof findings.$inferSelect
+
+/**
+ * Novedades de monitorización continua (Tarea 9b): assets/hosts/URLs NUEVOS
+ * detectados por el diff entre ciclos del scheduler. ÍNDICE RECONSTRUIBLE
+ * (los output.log del recon son la verdad). Unicidad por
+ * (proyecto, herramienta, item): lo que ya se vio no vuelve a avisar.
+ */
+export const reconNews = sqliteTable(
+  'recon_news',
+  {
+    id: integer('id').primaryKey({ autoIncrement: true }),
+    project: text('project').notNull(),
+    tool: text('tool').notNull(),
+    /** El asset nuevo (host/URL) tal cual lo dio el diff. */
+    item: text('item').notNull(),
+    firstSeenAt: integer('first_seen_at', { mode: 'timestamp_ms' })
+      .notNull()
+      .$defaultFn(() => new Date()),
+    lastSeenAt: integer('last_seen_at', { mode: 'timestamp_ms' })
+      .notNull()
+      .$defaultFn(() => new Date()),
+  },
+  (t) => [
+    uniqueIndex('recon_news_uq').on(t.project, t.tool, t.item),
+    index('recon_news_seen_idx').on(t.lastSeenAt),
+  ],
+)
+
+export type ReconNewsRow = typeof reconNews.$inferSelect
