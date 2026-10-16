@@ -45,6 +45,7 @@ clear message). Tests: `pnpm test` (Vitest). The SQLite index is rebuildable: `p
 |---|---|
 | `/` Proyectos | Project explorer: counters, delivered PDFs (viewer + drag-drop upload), markdown drafts |
 | `/proyectos/[project]` | Per-project tabs: **Programa · Entregados · Borradores · Escaneos · Recon** |
+| Programa tab → **Auditoría completa** | One click chains recon → mission → agent (skip-recon optional); operator-authorized, with budget + kill switch |
 | `/programas` | Multi-platform explorer (YesWeHack · Intigriti) over a neutral model |
 | `/escaneos` | Live status of launched agents (Orca) + recon actions |
 | `/recon` (tab) | Recon pipeline, single tools, diffing, findings + LLM triage, JS audit, mission seed |
@@ -105,6 +106,25 @@ flowchart LR
 
 Coverage is reported honestly (what was reconstructed vs. the gaps). LLM output is **leads,
 never facts**; launching anything active against the target stays a human click.
+
+## One-click full audit (orchestrated)
+
+Configure once per project (mission/prompt + agent + budget), then press **"Auditoría completa"**
+to chain the whole thing unattended: `[recon pipeline | skip] → mission → launch agent`.
+
+```mermaid
+flowchart LR
+  CLICK{Human click: full audit} --> CFG[Per-project config: prompt/agent/budget]
+  CFG -->|run recon| RECON[Recon pipeline - confirmed]
+  CFG -->|skip recon| MIS2[Mission seed]
+  RECON --> MIS2
+  MIS2 --> LAUNCH[Launch Orca agent]
+  KILL[Kill switch] -.cancel.-> RECON
+```
+
+**Operator control:** your click is the authorization — the recon runs without the per-stage
+gate, and the program's rules state is **informational only, it never blocks**. Operational
+guardrails remain: per-project opt-in, a budget (tokens/time/#agents) and a kill switch.
 
 ## Knowledge base — it breathes both ways
 

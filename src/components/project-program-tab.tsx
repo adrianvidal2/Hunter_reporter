@@ -5,6 +5,7 @@ import { useState } from 'react'
 import { syncProjectProgramAction, refreshProjectProgramAction } from '@/app/programas/actions'
 import { CopyButton } from './copy-button'
 import { LaunchWizard } from './launch-wizard'
+import { AuditPanel } from './audit-panel'
 import { currencySymbol, rewardRows, type CvssLevel } from '@/core/ywh/reward'
 import type { PromptMeta } from '@/core/prompts/prompts'
 import type { KbIndexEntry } from '@/core/kb/kb'
@@ -149,6 +150,11 @@ export function ProjectProgramTab({
           {refreshNote.msg}
         </p>
       ) : null}
+
+      {/* Auditoría completa (Tarea 12): un clic → recon → misión → agente */}
+      <div className="mt-4">
+        <AuditPanel project={project} />
+      </div>
 
       {wizardOpen ? (
         <LaunchWizard
