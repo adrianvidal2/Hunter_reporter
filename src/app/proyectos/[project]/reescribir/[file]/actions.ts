@@ -18,8 +18,10 @@ import { getEnv } from '@/lib/env'
 export async function generateDraftRewriteAction(
   path: string,
   templateName?: string,
+  /** Slugs KB ('reporte') marcados en la vista: contexto blindado para el LLM. */
+  kbSlugs?: string[],
 ): Promise<GenerateResult> {
   return generateRewriteFor(path, templateName, {
     onBeforeLlm: (p) => markManuallyApproved(p, getEnv().REPORTS_ROOT),
-  })
+  }, kbSlugs ?? [])
 }

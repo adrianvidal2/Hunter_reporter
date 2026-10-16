@@ -5,7 +5,7 @@
  * sqlmap/dalfox operan sobre UNA URL del scope + ruta opcional validada.
  */
 
-import { ReconError } from './tools'
+import { ReconError, isValidUrlTarget } from './tools'
 
 /**
  * Extrae los hosts vivos de la salida de httpx (output.log de un run):
@@ -22,6 +22,37 @@ export function parseHttpxHosts(output: string): string[] {
     const hostOnly = host.split('/')[0]!.split(':')[0]!.split('?')[0]!.trim()
     if (hostOnly === '' || hostOnly.startsWith('-')) continue
     if (!out.includes(hostOnly)) out.push(hostOnly)
+  }
+  return out
+}
+
+/** URLs http(s) dentro de una línea: katana JSON ("url":"…"), gospider
+ *  ([Get] [200] …) o listas planas (gau/waybackurls/gf). Sin espacios ni
+ *  comillas: la URL acaba ahí aunque vengan más campos pegados. */
+const URL_RE = /https?:\/\/[^\s"'<>()\[\]{}\\]+/gi
+
+/**
+ * Extrae URLs de la salida de los crawlers/archivadores (katana -jc,
+ * gospider, gau, waybackurls) y del filtrado de gf: una por aparición,
+ * válidas (host con forma de dominio/IP, jamás empieza por `-`), únicas
+ * y conservando el orden. Se preserva la caja (las rutas son sensibles).
+ * Líneas basura y flags disfrazados (`-oN`) no producen URLs.
+ */
+export function parseCrawlerUrls(output: string): string[] {
+  const out: string[] = []
+  const seen = new Set<string>()
+  for (const rawLine of output.split('\n')) {
+    const line = rawLine.trim()
+    if (line === '' || line.startsWith('-')) continue
+    for (const m of line.matchAll(URL_RE)) {
+      // puntuación final pegada por formato de log: fuera
+      const url = m[0].replace(/[.,;:!?]+$/, '')
+      if (!isValidUrlTarget(url)) continue
+      if (!seen.has(url)) {
+        seen.add(url)
+        out.push(url)
+      }
+    }
   }
   return out
 }

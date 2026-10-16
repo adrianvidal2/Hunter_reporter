@@ -1,5 +1,5 @@
 import { chatCompletion, LlmApiError } from './client'
-import { buildRewritePrompt } from './prompt'
+import { buildRewritePrompt, STYLE_RULES } from './prompt'
 
 /**
  * Llamada de reescritura (8.2) con política de errores del checkpoint 8.0.
@@ -38,6 +38,8 @@ export interface RewriteCallOptions {
   apiKey: string
   model: string
   timeoutMs?: number
+  /** Contexto KB (skills 'reporte' marcadas): DATO, va blindado en el prompt. */
+  kbContext?: string
   /** Para tests: fetch inyectable. */
   fetchImpl?: typeof fetch
   /** Para tests: espera inyectable (backoff). */
@@ -86,7 +88,7 @@ export async function rewriteReport(
   templateContent: string,
   opts: RewriteCallOptions,
 ): Promise<RewriteResult> {
-  const { system, user } = buildRewritePrompt(reportContent, templateContent)
+  const { system, user } = buildRewritePrompt(reportContent, templateContent, STYLE_RULES, opts.kbContext ?? '')
   const sleep = opts.sleepImpl ?? ((ms: number) => new Promise((r) => setTimeout(r, ms)))
   const fetchImpl = opts.fetchImpl ?? fetch
   const start = Date.now()

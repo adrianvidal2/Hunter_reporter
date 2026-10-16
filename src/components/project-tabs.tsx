@@ -7,6 +7,7 @@ import { deleteFileAction, moveFileAction } from '@/app/actions'
 import type { ProjectListing } from '@/core/fs/tree'
 import type { Program } from '@/core/ywh/types'
 import type { PromptMeta } from '@/core/prompts/prompts'
+import type { KbIndexEntry } from '@/core/kb/kb'
 import type { ScanRow } from '@/server/scans'
 import { ScansTable } from './scans-table'
 import { filterFiles, sortFiles, type SortBy, type SortDir } from '@/core/fs/sorting'
@@ -45,6 +46,7 @@ export function ProjectTabs({
   projects,
   program = null,
   prompts = [],
+  kbEntries = [],
   scans = [],
 }: {
   listing: ProjectListing
@@ -54,6 +56,8 @@ export function ProjectTabs({
   program?: Program | null
   /** Prompts globales para el wizard Lanzar (paso 2). */
   prompts?: PromptMeta[]
+  /** Índice KB 'tecnica' (global + ESTE proyecto) para el wizard Lanzar. */
+  kbEntries?: KbIndexEntry[]
   /** Escaneos de ESTE proyecto (una fila por agente), estado en vivo. */
   scans?: ScanRow[]
 }) {
@@ -137,7 +141,7 @@ export function ProjectTabs({
 
       {tab === 'programa' ? (
         <div className="mt-6">
-          <ProjectProgramTab program={program} project={listing.project} prompts={prompts} />
+          <ProjectProgramTab program={program} project={listing.project} prompts={prompts} kbEntries={kbEntries} />
         </div>
       ) : tab === 'escaneos' ? (
         <div className="mt-6">

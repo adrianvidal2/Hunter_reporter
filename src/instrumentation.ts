@@ -25,4 +25,9 @@ export async function register() {
   await service.ready.catch((err) => {
     console.error('watcher: fallo al escanear el árbol inicial:', err)
   })
+
+  // 9a: arrancar el scheduler de recon pasivo (singleton en globalThis;
+  // opt-in POR PROYECTO — sin config enabled, no lanza NADA).
+  const { getReconScheduler } = await import('./server/recon-scheduler')
+  getReconScheduler({ root: reportsRoot }).start()
 }

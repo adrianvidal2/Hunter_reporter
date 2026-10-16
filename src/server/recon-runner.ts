@@ -17,6 +17,7 @@ import {
   type ToolingVerdict,
   type ToolId,
   buildUrlToolCommand,
+  buildGfCommand,
   DEFAULT_WORDLIST,
 } from '@/core/recon/tools'
 import { loadReconSettings, resolveBinPath } from '@/core/recon/settings'
@@ -413,6 +414,95 @@ export class ReconRunner {
       settings.timeoutMinutes !== undefined ? settings.timeoutMinutes * 60_000 : DEFAULT_TIMEOUT_MS
     const timeoutMs = Math.min(Math.max(input.timeoutMs ?? configuredMs, MIN_TIMEOUT_MS), MAX_TIMEOUT_MS)
 
+    return this.beginSingleCommandRun({
+      project: input.project,
+      toolId: input.toolId,
+      command,
+      binPath,
+      binStat: { size: binStat.size, mtimeMs: Math.round(binStat.mtimeMs) },
+      targets: [input.url],
+      uaInjected: tool.supportsUserAgent && input.userAgent !== undefined,
+      verdict,
+      confirmedByUser: input.confirmed ?? false,
+      timeoutMs,
+    })
+  }
+
+  /**
+   * Lanza gf (filtro LOCAL sobre URLs por stdin con patrón de lista fija):
+   * la receta de gf no pasa por buildToolCommands (el patrón es un
+   * parámetro fijo del núcleo, no del cliente), así que el orquestador del
+   * pipeline la lanza aquí. Las URLs llegan YA interseccionadas con el
+   * scope por el orquestador (con rutas, el match exacto del scope no
+   * aplica). Pasiva: sin UA ni gate; sin confirmación no hace falta.
+   */
+  startGfRun(input: {
+    project: string
+    pattern: string
+    /** URLs ya interseccionadas con el scope por el orquestador. */
+    urls: string[]
+    timeoutMs?: number
+  }): StartReconResult {
+    if (!getTool('gf')) return { ok: false, error: 'gf no está en la lista blanca' }
+    if (!listProjects(this.root).includes(input.project)) {
+      return { ok: false, error: `No existe el proyecto: ${input.project}` }
+    }
+
+    const binPath = resolveBinPath('gf')
+    try {
+      statSync(binPath)
+      accessSync(binPath, 1) // X_OK
+    } catch {
+      return { ok: false, error: `El binario de gf no existe o no es ejecutable: ${binPath}` }
+    }
+    const binStat = statSync(binPath)
+
+    let command: ToolCommand
+    try {
+      command = buildGfCommand(input.pattern, input.urls)
+    } catch (err) {
+      return { ok: false, error: err instanceof Error ? err.message : 'Error en la receta' }
+    }
+
+    const settings = loadReconSettings()
+    const configuredMs =
+      settings.timeoutMinutes !== undefined ? settings.timeoutMinutes * 60_000 : DEFAULT_TIMEOUT_MS
+    const timeoutMs = Math.min(Math.max(input.timeoutMs ?? configuredMs, MIN_TIMEOUT_MS), MAX_TIMEOUT_MS)
+
+    return this.beginSingleCommandRun({
+      project: input.project,
+      toolId: 'gf',
+      command,
+      binPath,
+      binStat: { size: binStat.size, mtimeMs: Math.round(binStat.mtimeMs) },
+      targets: input.urls,
+      uaInjected: false,
+      verdict: assessAutomatedTooling({}),
+      confirmedByUser: false,
+      timeoutMs,
+    })
+  }
+
+  /**
+   * Tramo común de los lanzamientos de UN comando (URL concreta y gf):
+   * directorio de salida, record, persist, timer de timeout y ejecución.
+   * El cabezal `$ bin args` lo escribe execOne (igual que en start()).
+   */
+  private beginSingleCommandRun(input: {
+    project: string
+    toolId: string
+    command: ToolCommand
+    binPath: string
+    binStat: { size: number; mtimeMs: number }
+    targets: string[]
+    uaInjected: boolean
+    verdict: ToolingVerdict
+    confirmedByUser: boolean
+    timeoutMs: number
+  }): StartReconResult {
+    const tool = getTool(input.toolId)
+    if (!tool) return { ok: false, error: `Herramienta fuera de la lista blanca: ${input.toolId}` }
+
     const stamp = new Date(this.nowMs())
       .toISOString()
       .replace(/[-:]/g, '')
@@ -431,20 +521,20 @@ export class ReconRunner {
       runId,
       project: input.project,
       toolId: input.toolId,
-      binPath,
-      binary: { size: binStat.size, mtimeMs: Math.round(binStat.mtimeMs) },
-      commands: [{ args: command.args }],
-      targets: [input.url],
+      binPath: input.binPath,
+      binary: input.binStat,
+      commands: [{ args: input.command.args }],
+      targets: input.targets,
       rejected: [],
-      uaInjected: tool.supportsUserAgent && input.userAgent !== undefined,
+      uaInjected: input.uaInjected,
       warnings: [],
-      rules: verdict,
-      confirmedByUser: input.confirmed ?? false,
+      rules: input.verdict,
+      confirmedByUser: input.confirmedByUser,
       status: 'running',
       startedAt: new Date(this.nowMs()).toISOString(),
       pid: null,
       dirName,
-      timeoutMs,
+      timeoutMs: input.timeoutMs,
     }
     const run: RunState = { record, outputDirAbs, proc: null, status: 'running' }
     this.runs.set(runId, run)
@@ -455,12 +545,11 @@ export class ReconRunner {
       run.status = 'timeout'
       run.record.status = 'timeout'
       this.terminateGroup(run)
-    }, timeoutMs)
+    }, input.timeoutMs)
     run.timeoutTimer.unref?.()
 
     const outputLog = path.join(outputDirAbs, 'output.log')
-    appendFileSync(outputLog, `$ ${binPath} ${command.args.join(' ')}\n`)
-    void this.execSequence(run, [command], outputLog)
+    void this.execSequence(run, [input.command], outputLog)
 
     return { ok: true, runId, outputDir: outRel, warnings: [] }
   }
@@ -520,6 +609,10 @@ export class ReconRunner {
 
       proc.stdout?.on('data', (chunk: Buffer) => this.appendOutput(run, outputLog, chunk))
       proc.stderr?.on('data', (chunk: Buffer) => this.appendOutput(run, outputLog, chunk))
+      // EPIPE asíncrono: el binario puede morir ANTES de leer su stdin y el
+      // error del socket llega fuera del try/catch síncrono. Se traga: el
+      // estado del run ya refleja la salida/muerte real del proceso.
+      proc.stdin?.on('error', () => {})
       try {
         proc.stdin?.write((command.stdin ?? '') + '\n')
         proc.stdin?.end()

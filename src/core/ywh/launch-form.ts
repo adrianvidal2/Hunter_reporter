@@ -184,6 +184,17 @@ export function promptContentFor(
   return prompts.find((p) => p.slug === slug)?.content ?? ''
 }
 
+/**
+ * Adjunta el contexto KB (skills 'tecnica' marcadas en el paso 2) al FINAL
+ * del prompt base, separado con un marcador claro para el agente.
+ * SIN contexto (nada marcado o vacío) → el prompt sale INTACTO, byte a byte.
+ */
+export function applyKbToPrompt(basePrompt: string, kbContext: string): string {
+  const ctx = kbContext.trim()
+  if (ctx === '') return basePrompt
+  return `${basePrompt.trimEnd()}\n\n---\n\n${ctx}`
+}
+
 /** Nombre para "Guardar como": `<nombre>_<programa>`. El saneado de slug y
  *  el control de colisión los hace createPrompt (igual que la ventana). */
 export function savedAsName(baseName: string, program: string): string {

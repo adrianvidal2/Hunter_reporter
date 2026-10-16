@@ -5,6 +5,7 @@ import { MarkdownPreview } from '@/components/markdown-preview'
 import { RewriteReview } from '@/components/rewrite-review'
 import { PathEscapeError, resolveSafe } from '@/core/fs/paths'
 import { listProject, listProjects } from '@/core/fs/tree'
+import { listKbIndex } from '@/core/kb/kb'
 import {
   DEFAULT_TEMPLATE_NAME,
   ensureDefaultTemplate,
@@ -43,6 +44,8 @@ export default async function ReescribirBorradorPage({
   const templates = listTemplateOptions(project, root)
   const preferred = findTemplate(DEFAULT_TEMPLATE_NAME, { project, root })?.name
   const preselected = templates.find((t) => t.name === preferred)?.name ?? templates[0]?.name
+  // Índice KB 'reporte' (global + ESTE proyecto): el usuario marca qué entra como contexto.
+  const kbEntries = listKbIndex({ project, category: 'reporte', root })
 
   return (
     <div>
@@ -72,6 +75,7 @@ export default async function ReescribirBorradorPage({
         path={entry.relPath}
         templates={templates}
         preselectedTemplate={preselected}
+        kbEntries={kbEntries}
         generate={generateDraftRewriteAction}
       />
     </div>

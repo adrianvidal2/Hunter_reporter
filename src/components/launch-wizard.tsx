@@ -3,9 +3,11 @@
 import { useEffect, useMemo, useRef, useState, useTransition } from 'react'
 import type { PromptMeta } from '@/core/prompts/prompts'
 import { createPromptAction } from '@/app/prompts/actions'
-import { launchOrcaAction } from '@/app/proyectos/[project]/launch'
+import { buildMissionAction, launchOrcaAction, renderKbContextAction } from '@/app/proyectos/[project]/launch'
+import type { KbIndexEntry } from '@/core/kb/kb'
 import type { Program } from '@/core/ywh/types'
 import {
+  applyKbToPrompt,
   buildLaunchDraft,
   DEFAULT_LAUNCH_MODE,
   agentsFromCounts,
@@ -18,7 +20,6 @@ import {
   promptIsEmpty,
   providerCount,
   savedAsName,
-  shortProviderName,
   toggleProviderCounts,
   totalAgents,
   validateAgents,
@@ -42,12 +43,14 @@ interface WizardProps {
   project: string
   program: Program
   prompts: PromptMeta[]
+  /** Índice KB 'tecnica' (global + ESTE proyecto) para adjuntar al prompt. */
+  kbEntries?: KbIndexEntry[]
   onClose: () => void
 }
 
 type Step = 1 | 2 | 3
 
-export function LaunchWizard({ project, program, prompts, onClose }: WizardProps) {
+export function LaunchWizard({ project, program, prompts, kbEntries = [], onClose }: WizardProps) {
   const [step, setStep] = useState<Step>(1)
   const [checked, setChecked] = useState<Set<string>>(new Set(program.scopes.map((s) => s.scope)))
   const [username, setUsername] = useState('')
@@ -62,6 +65,16 @@ export function LaunchWizard({ project, program, prompts, onClose }: WizardProps
   const [promptSlug, setPromptSlug] = useState<string | null>(null)
   const [promptText, setPromptText] = useState('')
   const [saveNote, setSaveNote] = useState<string | null>(null)
+
+  // Conocimiento KB (Tarea 6c): skills 'tecnica' marcadas para adjuntar
+  const [kbSelected, setKbSelected] = useState<Set<string>>(new Set())
+  const toggleKb = (slug: string) =>
+    setKbSelected((prev) => {
+      const next = new Set(prev)
+      if (next.has(slug)) next.delete(slug)
+      else next.add(slug)
+      return next
+    })
 
   // Agentes expandidos (para validar y para el resumen)
   const agents = useMemo(() => {
@@ -139,7 +152,30 @@ export function LaunchWizard({ project, program, prompts, onClose }: WizardProps
     })
   }
 
-  // Confirmar: valida agentes (≥1, prompts no vacíos) y lanza.
+  /** Semilla de misión (7e): ensambla el prompt con OpenAPI/primitivas/huecos. ENSAMBLAR ≠ EJECUTAR. */
+  const loadMission = () => {
+    setError(null)
+    setSaveNote(null)
+    startTransition(async () => {
+      const res = await buildMissionAction(project)
+      if (!res.ok) {
+        setError(res.error ?? 'No se pudo cargar la misión.')
+        return
+      }
+      if (distinctPrompts) {
+        const perLabel: Record<string, string> = {}
+        for (const a of agents) perLabel[a.label] = res.mission!
+        setPromptByLabel((prev) => ({ ...perLabel, ...prev }))
+      } else {
+        setPromptText(res.mission!)
+      }
+      setPromptSlug(null)
+      setSaveNote(`Misión JS ensamblada desde ${res.harvestDirRel}. Revísala y lanza cuando quieras: nada se ha ejecutado.`)
+    })
+  }
+
+  // Confirmar: valida agentes (≥1, prompts no vacíos), adjunta el contexto
+  // KB de las skills marcadas (renderKbContext + applyKbToPrompt) y lanza.
   const confirm = () => {
     const err = validateAgents(agents)
     if (err) {
@@ -157,14 +193,31 @@ export function LaunchWizard({ project, program, prompts, onClose }: WizardProps
       mode,
     })
 
+    // Con KB marcada: contexto server-side y prompt final = base + skills.
+    // Sin nada marcado → los prompts salen EXACTAMENTE como están.
+    const attachKb = async (list: LaunchAgent[]): Promise<{ agents: LaunchAgent[]; error?: string }> => {
+      if (kbSelected.size === 0) return { agents: list }
+      const res = await renderKbContextAction([...kbSelected], project)
+      if (!res.ok) return { agents: list, error: res.error }
+      return {
+        agents: list.map((a) => ({ ...a, prompt: applyKbToPrompt(a.prompt, res.context) })),
+      }
+    }
+
     if (mode === 'orca') {
       setLaunching(true)
       startTransition(async () => {
+        const withKb = await attachKb(draft.agents)
+        if (withKb.error) {
+          setLaunching(false)
+          setError(`No se pudo cargar el conocimiento KB: ${withKb.error}`)
+          return
+        }
         const res = await launchOrcaAction({
           project,
           selectedScopes: draft.assets,
           mode: 'orca',
-          agents: draft.agents,
+          agents: withKb.agents,
         })
         setLaunching(false)
         setSaveNote(null)
@@ -176,8 +229,13 @@ export function LaunchWizard({ project, program, prompts, onClose }: WizardProps
               : `✗ ${p.label} → ${p.error ?? 'error'}`,
           )
           setLaunchOutcome(
-            ['Se lanzó un worktree por agente:', ...lines].join('\n') +
-              (res.note ? `\n${res.note}` : ''),
+            [
+              kbSelected.size > 0 ? `Conocimiento adjunto a los prompts: ${kbSelected.size} skill(es).` : null,
+              'Se lanzó un worktree por agente:',
+              ...lines,
+            ]
+              .filter((l): l is string => l !== null)
+              .join('\n') + (res.note ? `\n${res.note}` : ''),
           )
         } else {
           setError(res.error)
@@ -186,7 +244,7 @@ export function LaunchWizard({ project, program, prompts, onClose }: WizardProps
     } else {
       // Modo Terminal: fase posterior, solo recoge en memoria.
       setSaveNote(
-        `Recogido en memoria: ${draft.agents.length} agente(s), prompts listos, modo «${draft.mode}». (Modo Terminal aún no implementado.)`,
+        `Recogido en memoria: ${draft.agents.length} agente(s), prompts listos${kbSelected.size > 0 ? ` + ${kbSelected.size} skill(es) KB adjunta(s)` : ''}, modo «${draft.mode}». (Modo Terminal aún no implementado.)`,
       )
     }
   }
@@ -391,15 +449,26 @@ export function LaunchWizard({ project, program, prompts, onClose }: WizardProps
               <div>
                 <div className="flex items-center justify-between gap-2">
                   <h3 className="text-sm font-semibold">Prompt (compartido por todos los agentes)</h3>
-                  <button
-                    type="button"
-                    onClick={saveAs}
-                    disabled={pending || promptText.trim() === ''}
-                    className="rounded-md border border-zinc-300 px-2.5 py-1 text-xs hover:bg-zinc-100 disabled:opacity-40 dark:border-zinc-700 dark:hover:bg-zinc-900"
-                    title="Guarda este texto como un prompt NUEVO en la biblioteca (no pisa el original)"
-                  >
-                    Guardar como…
-                  </button>
+                  <div className="flex shrink-0 gap-2">
+                    <button
+                      type="button"
+                      onClick={loadMission}
+                      disabled={pending}
+                      title="Ensambla la misión con OpenAPI/primitivas/secretos/huecos del último harvest de JS (no ejecuta nada)"
+                      className="rounded-md border border-zinc-300 px-2.5 py-1 text-xs hover:bg-zinc-100 disabled:opacity-40 dark:border-zinc-700 dark:hover:bg-zinc-900"
+                    >
+                      Cargar misión JS (recon)
+                    </button>
+                    <button
+                      type="button"
+                      onClick={saveAs}
+                      disabled={pending || promptText.trim() === ''}
+                      className="rounded-md border border-zinc-300 px-2.5 py-1 text-xs hover:bg-zinc-100 disabled:opacity-40 dark:border-zinc-700 dark:hover:bg-zinc-900"
+                      title="Guarda este texto como un prompt NUEVO en la biblioteca (no pisa el original)"
+                    >
+                      Guardar como…
+                    </button>
+                  </div>
                 </div>
                 <select
                   value={promptSlug ?? ''}
@@ -429,6 +498,48 @@ export function LaunchWizard({ project, program, prompts, onClose }: WizardProps
                 ) : null}
               </div>
             )}
+
+            {/* Conocimiento KB (skills técnicas) para adjuntar al prompt */}
+            {kbEntries.length > 0 ? (
+              <div>
+                <h3 className="text-sm font-semibold">
+                  Conocimiento <span className="text-zinc-400">({kbSelected.size} marcadas)</span>
+                </h3>
+                <p className="mt-0.5 text-xs text-zinc-500 dark:text-zinc-400">
+                  Skills técnicas (global + este proyecto) que se ADJUNTAN al prompt de todos los agentes.
+                  Sin marcar, el prompt no cambia.
+                </p>
+                <ul className="mt-2 max-h-44 space-y-1 overflow-y-auto">
+                  {kbEntries.map((e) => {
+                    const active = kbSelected.has(e.slug)
+                    return (
+                      <li key={`${e.scope}-${e.slug}`}>
+                        <label
+                          className={`flex cursor-pointer items-start gap-2 rounded-md border px-3 py-2 text-sm transition-colors ${
+                            active
+                              ? 'border-zinc-900 bg-zinc-100 dark:border-zinc-100 dark:bg-zinc-800'
+                              : 'border-zinc-300 hover:bg-zinc-50 dark:border-zinc-700 dark:hover:bg-zinc-900'
+                          }`}
+                        >
+                          <input type="checkbox" checked={active} onChange={() => toggleKb(e.slug)} className="mt-0.5 h-4 w-4" />
+                          <span className="min-w-0">
+                            <span className="font-medium">{e.name}</span>
+                            <span
+                              className={`ml-1.5 rounded px-1 py-0.5 text-[10px] ${e.scope === 'project' ? 'bg-emerald-100 text-emerald-800 dark:bg-emerald-950 dark:text-emerald-300' : 'bg-zinc-200 text-zinc-600 dark:bg-zinc-900 dark:text-zinc-400'}`}
+                            >
+                              {e.scope === 'project' ? 'proyecto' : 'global'}
+                            </span>
+                            {e.description !== '' ? (
+                              <span className="mt-0.5 block text-xs text-zinc-500 dark:text-zinc-400">{e.description}</span>
+                            ) : null}
+                          </span>
+                        </label>
+                      </li>
+                    )
+                  })}
+                </ul>
+              </div>
+            ) : null}
 
             <div className="flex justify-end gap-2 pt-1">
               <button type="button" onClick={() => setStep(1)} disabled={pending} className="rounded-md border border-zinc-300 px-4 py-1.5 text-sm disabled:opacity-40 dark:border-zinc-700">← Atrás</button>

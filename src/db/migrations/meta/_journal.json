@@ -22,6 +22,34 @@
       "when": 1787337475099,
       "tag": "0002_eminent_timeslip",
       "breakpoints": true
+    },
+    {
+      "idx": 3,
+      "version": "6",
+      "when": 1792010541057,
+      "tag": "0003_huge_maximus",
+      "breakpoints": true
+    },
+    {
+      "idx": 4,
+      "version": "6",
+      "when": 1792011363017,
+      "tag": "0004_clean_ricochet",
+      "breakpoints": true
+    },
+    {
+      "idx": 5,
+      "version": "6",
+      "when": 1792094687578,
+      "tag": "0005_kb_fts",
+      "breakpoints": true
+    },
+    {
+      "idx": 6,
+      "version": "6",
+      "when": 1792182764124,
+      "tag": "0006_recon_news",
+      "breakpoints": true
     }
   ]
 }

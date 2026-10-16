@@ -1,4 +1,4 @@
-import { integer, real, sqliteTable, text } from 'drizzle-orm/sqlite-core'
+import { index, integer, real, sqliteTable, text, uniqueIndex } from 'drizzle-orm/sqlite-core'
 
 /**
  * Índice SQLite (bloque 2). El sistema de ficheros es la verdad: estas
@@ -86,3 +86,81 @@ export const llmRuns = sqliteTable('llm_runs', {
 })
 
 export type LlmRun = typeof llmRuns.$inferSelect
+
+/**
+ * Findings de recon (Tarea 3, nuclei primero): ÍNDICE RECONSTRUIBLE desde
+ * los output.log del árbol (`rebuildFindingsFromDisk`); el disco es la
+ * verdad, esta tabla solo acelera la vista agregada. Unicidad por
+ * (proyecto, template, host): el mismo hallazgo en varios runs es UNA fila
+ * con firstSeen/lastSeen.
+ */
+export const findings = sqliteTable(
+  'findings',
+  {
+    id: integer('id').primaryKey({ autoIncrement: true }),
+    /** Proyecto (primer segmento de la ruta del run). */
+    project: text('project').notNull(),
+    /** Herramienta de la que salió (hoy: nuclei). */
+    toolId: text('tool_id').notNull(),
+    /** Dir del run (timestamp) bajo pentest/recon/<toolId>/: trazabilidad. */
+    runDir: text('run_dir').notNull(),
+    /** template-id de nuclei. */
+    templateId: text('template_id').notNull(),
+    /** Host del hit (normalizado a minúsculas por el parser). */
+    host: text('host').notNull(),
+    severity: text('severity', { enum: ['info', 'low', 'medium', 'high', 'critical'] })
+      .notNull()
+      .default('info'),
+    /** URL/ruta exacta del match, tal cual la dio la herramienta (no confiable). */
+    matchedAt: text('matched_at'),
+    /** Nombre humano del template. */
+    name: text('name'),
+    firstSeenAt: integer('first_seen_at', { mode: 'timestamp_ms' })
+      .notNull()
+      .$defaultFn(() => new Date()),
+    lastSeenAt: integer('last_seen_at', { mode: 'timestamp_ms' })
+      .notNull()
+      .$defaultFn(() => new Date()),
+    // ── Triaje LLM (Tarea 4): PRE-MARCA que el humano honra o descarta.
+    // Nunca borra: reconstruir el índice desde disco las limpia.
+    triageLabel: text('triage_label', { enum: ['real', 'ruido', 'dudoso'] }),
+    triageConfianza: real('triage_confianza'),
+    triageRazon: text('triage_razon'),
+    triagedAt: integer('triaged_at', { mode: 'timestamp_ms' }),
+  },
+  (t) => [
+    uniqueIndex('findings_project_template_host_uq').on(t.project, t.templateId, t.host),
+    index('findings_project_severity_idx').on(t.project, t.severity),
+  ],
+)
+
+export type FindingRow = typeof findings.$inferSelect
+
+/**
+ * Novedades de monitorización continua (Tarea 9b): assets/hosts/URLs NUEVOS
+ * detectados por el diff entre ciclos del scheduler. ÍNDICE RECONSTRUIBLE
+ * (los output.log del recon son la verdad). Unicidad por
+ * (proyecto, herramienta, item): lo que ya se vio no vuelve a avisar.
+ */
+export const reconNews = sqliteTable(
+  'recon_news',
+  {
+    id: integer('id').primaryKey({ autoIncrement: true }),
+    project: text('project').notNull(),
+    tool: text('tool').notNull(),
+    /** El asset nuevo (host/URL) tal cual lo dio el diff. */
+    item: text('item').notNull(),
+    firstSeenAt: integer('first_seen_at', { mode: 'timestamp_ms' })
+      .notNull()
+      .$defaultFn(() => new Date()),
+    lastSeenAt: integer('last_seen_at', { mode: 'timestamp_ms' })
+      .notNull()
+      .$defaultFn(() => new Date()),
+  },
+  (t) => [
+    uniqueIndex('recon_news_uq').on(t.project, t.tool, t.item),
+    index('recon_news_seen_idx').on(t.lastSeenAt),
+  ],
+)
+
+export type ReconNewsRow = typeof reconNews.$inferSelect

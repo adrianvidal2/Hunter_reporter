@@ -241,6 +241,26 @@ describe('ReconRunner · ciclo de vida', () => {
     expect(() => process.kill(pid, 0)).toThrow()
   })
 
+  it('regresión EPIPE: el binario muere antes de leer stdin → el run termina en su estado y no hay excepción no capturada', async () => {
+    // el script sale al instante sin leer stdin: el write puede llegar al
+    // socket ya muerto (EPIPE asíncrono). Con el handler de error atado, el
+    // run acaba 'done' y vitest no recibe ninguna excepción no capturada.
+    makeScript('gau', 'exit 0')
+    saveReconSettings({ binPaths: { gau: path.join(binDir, 'gau') } })
+    const { runner } = newRunner()
+    const res = runner.start({
+      project: 'demo', toolId: 'gau', targets: ['api.ejemplo.com'], scope: ['api.ejemplo.com'], timeoutMs: 5000,
+    })
+    expect(res.ok).toBe(true)
+    if (!res.ok) return
+    const run = await waitFor(() => {
+      const r = runner.getRun(res.runId)
+      return r && r.status !== 'running' ? r : undefined
+    })
+    expect(run.status).toBe('done')
+    expect(run.exitCode).toBe(0)
+  })
+
   it('streaming: los suscriptores reciben los chunks de salida', async () => {
     makeScript('dnsx', 'echo chunk-streaming')
     saveReconSettings({ binPaths: { dnsx: path.join(binDir, 'dnsx') } })

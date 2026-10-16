@@ -11,11 +11,16 @@ import {
   listReconRunsAction,
   cancelReconAction,
   killOrphanAction,
+  diffReconAction,
   type ReconContext,
 } from '@/app/escaneos/recon-actions'
 import type { ReconRunRecord } from '@/server/recon-runner'
+import type { ReconDiffResult } from '@/server/recon-diff'
+import { ReconPipelineSection } from '@/components/recon-pipeline'
+import { ReconFindingsSection } from '@/components/recon-findings'
 import Link from 'next/link'
 import { RECON_TOOLS } from '@/core/recon/tools'
+import { isDiffableTool } from '@/core/recon/diff'
 
 /**
  * Subpestana Recon (pestaña Escaneos del proyecto): las herramientas en
@@ -57,6 +62,11 @@ export function ReconPanel({ project }: { project: string }) {
   const [apexAccepted, setApexAccepted] = useState(false)
   const [viewOutput, setViewOutput] = useState<{ key: string; text: string } | null>(null)
 
+  // diffing: qué hay NUEVO respecto al último run
+  const [diffTool, setDiffTool] = useState('subfinder')
+  const [diff, setDiff] = useState<ReconDiffResult | null>(null)
+  const [diffBusy, setDiffBusy] = useState(false)
+
   // sqlmap/dalfox
   const [urlTool, setUrlTool] = useState<'sqlmap' | 'dalfox'>('sqlmap')
   const [urlTarget, setUrlTarget] = useState('')
@@ -85,6 +95,7 @@ export function ReconPanel({ project }: { project: string }) {
   const scopeTargets = context?.targets ?? []
   const apexOfWildcard = scopeTargets.filter((t) => t.startsWith('*.')).map((t) => t.replace(/^\*\./, ''))
   const isFuzzer = selectedTool !== null && FUZZERS.has(selectedTool)
+  const diffableTools = RECON_TOOLS.filter((t) => isDiffableTool(t.id))
 
   const toggle = (set: Set<string>, apply: (s: Set<string>) => void, t: string) => {
     const next = new Set(set)
@@ -142,6 +153,14 @@ export function ReconPanel({ project }: { project: string }) {
     void getReconOutputAction(project, run.toolId, run.dirName).then((r) => {
       // solo si sigue abierto este run (evita pisar otro que se abrió después)
       setViewOutput((prev) => (prev?.key === run.runId ? { key: run.runId, text: r.output ?? r.error ?? '' } : prev))
+    })
+  }
+
+  const compare = () => {
+    setDiffBusy(true)
+    void diffReconAction(project, diffTool).then((res) => {
+      setDiff(res)
+      setDiffBusy(false)
     })
   }
 
@@ -328,6 +347,9 @@ export function ReconPanel({ project }: { project: string }) {
         </p>
       </section>
 
+      {/* Pipeline encadenado determinista: el plan lo propone el servidor y el humano lo aprueba */}
+      <ReconPipelineSection project={project} onRunsChanged={refreshRuns} />
+
       {/* Histórico de runs */}
       <section aria-label="Histórico de runs">
         <div className="flex items-center justify-between">
@@ -380,6 +402,66 @@ export function ReconPanel({ project }: { project: string }) {
           </pre>
         ) : null}
       </section>
+
+      {/* Cambios desde el último run (diffing de los dos runs más recientes) */}
+      <section aria-label="Cambios desde el último run">
+        <h3 className="text-sm font-semibold">Cambios desde el último run</h3>
+        <p className="mt-1 text-xs text-zinc-500 dark:text-zinc-400">
+          Compara los dos runs más recientes de una herramienta que produce un inventario (hosts/URLs):
+          lo NUEVO es superficie nueva de ataque.
+        </p>
+        <div className="mt-2 flex flex-wrap items-center gap-2">
+          <select
+            value={diffTool}
+            onChange={(e) => setDiffTool(e.target.value)}
+            aria-label="Herramienta a comparar"
+            className="rounded-md border border-zinc-300 bg-transparent px-2 py-1.5 text-sm dark:border-zinc-700 dark:[color-scheme:dark]"
+          >
+            {diffableTools.map((t) => (
+              <option key={t.id} value={t.id}>{t.label}</option>
+            ))}
+          </select>
+          <button
+            type="button"
+            onClick={compare}
+            disabled={diffBusy}
+            className="rounded-md border border-zinc-300 px-3 py-1.5 text-sm hover:bg-zinc-50 disabled:opacity-40 dark:border-zinc-700 dark:hover:bg-zinc-900"
+          >
+            {diffBusy ? 'Comparando…' : 'Comparar'}
+          </button>
+        </div>
+        {diff ? (
+          diff.ok && diff.diff ? (
+            <div className="mt-3 space-y-2">
+              <p className="text-xs text-zinc-500 dark:text-zinc-400">
+                {diff.previous?.dirName} ({diff.previous?.itemCount} items) → {diff.current?.dirName}{' '}({diff.current?.itemCount} items)
+              </p>
+              {diff.diff.added.length === 0 && diff.diff.removed.length === 0 ? (
+                <p className="text-sm text-zinc-500 dark:text-zinc-400">
+                  Sin cambios respecto al run anterior ({diff.diff.unchanged.length} sin cambiar).
+                </p>
+              ) : (
+                <ul className="max-h-72 overflow-auto rounded-md border border-zinc-200 p-2 font-mono text-xs dark:border-zinc-800">
+                  {diff.diff.added.map((item) => (
+                    <li key={`added-${item}`} className="py-0.5 text-emerald-600 dark:text-emerald-400">+ {item}</li>
+                  ))}
+                  {diff.diff.removed.map((item) => (
+                    <li key={`removed-${item}`} className="line-through py-0.5 text-red-600 dark:text-red-400">− {item}</li>
+                  ))}
+                </ul>
+              )}
+              <p className="text-xs text-zinc-500 dark:text-zinc-400">
+                +{diff.diff.added.length} nuevo(s) · −{diff.diff.removed.length} desaparecido(s) · {diff.diff.unchanged.length} sin cambiar
+              </p>
+            </div>
+          ) : (
+            <p role="alert" className="mt-2 text-sm text-amber-600 dark:text-amber-400">⚠ {diff.reason}</p>
+          )
+        ) : null}
+      </section>
+
+      {/* Findings agregados (índice reconstruible desde los output.log) */}
+      <ReconFindingsSection project={project} />
     </div>
   )
 }
