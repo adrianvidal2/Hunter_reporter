@@ -52,3 +52,4 @@ idempotencia y el camino feliz. Nada se marca como hecho con tests en rojo o par
 | 10 | **Correlación cross-proyecto** — epic (SQL sobre findings) | ✅ hecho (10a–10b completadas; validación final pendiente) |
 | 10a | Queries de correlación | ✅ hecho (correlation.ts read-only + 7 tests; validación final pendiente) |
 | 10b | Vista de correlación | ✅ hecho (/correlacion read-only + sidebar; validación final pendiente) |
+| 11 | Agrupar la KB por tag/categoría (facetado) | ✅ hecho (facet.ts puro + tags en editor + selector/grupos en /kb + 8 tests; validación final pendiente) |

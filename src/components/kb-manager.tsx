@@ -12,6 +12,7 @@ import {
   type KbEntry,
   type KbIndexEntry,
 } from '@/app/kb/actions'
+import { groupKbEntries, UNTAGGED_KEY } from '@/core/kb/facet'
 
 /**
  * Gestión CRUD de la KB (Tarea 6b), calcada del gestor de Prompts:
@@ -79,6 +80,13 @@ export function KbManager({ initial, projects }: { initial: KbIndexEntry[]; proj
           (scopeFilter === 'all' || e.scope === scopeFilter),
       ),
     [items, categoryFilter, scopeFilter],
+  )
+
+  const [groupBy, setGroupBy] = useState<'none' | 'tag' | 'category'>('none')
+
+  const grouped = useMemo(
+    () => (groupBy === 'none' ? null : groupKbEntries(visible, { by: groupBy })),
+    [visible, groupBy],
   )
 
   const reset = () => {
@@ -183,6 +191,45 @@ export function KbManager({ initial, projects }: { initial: KbIndexEntry[]; proj
     })
   }
 
+  const entryRow = (e: KbIndexEntry) => (
+    <li key={`${e.scope}-${e.slug}`} className="flex items-start justify-between gap-4 py-2.5">
+      <div className="min-w-0">
+        <p className="text-sm font-medium">
+          {e.name}{' '}
+          <span className={`ml-1 rounded px-1.5 py-0.5 text-[10px] ${e.category === 'reporte' ? 'bg-sky-100 text-sky-800 dark:bg-sky-950 dark:text-sky-300' : 'bg-zinc-100 text-zinc-600 dark:bg-zinc-900 dark:text-zinc-400'}`}>
+            {CATEGORY_LABEL[e.category]}
+          </span>{' '}
+          <span className={`rounded px-1.5 py-0.5 text-[10px] ${e.scope === 'project' ? 'bg-emerald-100 text-emerald-800 dark:bg-emerald-950 dark:text-emerald-300' : 'bg-zinc-100 text-zinc-600 dark:bg-zinc-900 dark:text-zinc-400'}`}>
+            {e.scope === 'project' ? `proyecto: ${project}` : 'global'}
+          </span>
+        </p>
+        <p className="font-mono text-xs text-zinc-400">{e.slug}</p>
+        {e.description !== '' ? (
+          <p className="mt-1 line-clamp-2 text-xs text-zinc-500 dark:text-zinc-400">{e.description}</p>
+        ) : null}
+        {e.tags.length > 0 ? (
+          <p className="mt-1 font-mono text-[10px] text-zinc-400">#{e.tags.join(' #')}</p>
+        ) : null}
+      </div>
+      <div className="flex shrink-0 gap-2">
+        <button
+          type="button"
+          onClick={() => startEdit(e)}
+          className="rounded-md border border-zinc-300 px-2 py-1 text-xs hover:bg-zinc-100 dark:border-zinc-700 dark:hover:bg-zinc-900"
+        >
+          Editar
+        </button>
+        <button
+          type="button"
+          onClick={() => del(e)}
+          className="rounded-md border border-red-300 px-2 py-1 text-xs text-red-600 hover:bg-red-50 dark:border-red-800 dark:text-red-400 dark:hover:bg-red-950"
+        >
+          Borrar
+        </button>
+      </div>
+    </li>
+  )
+
   return (
     <div>
       {/* Filtros: ámbito (proyecto), categoría y scope resuelto */}
@@ -229,6 +276,19 @@ export function KbManager({ initial, projects }: { initial: KbIndexEntry[]; proj
             </select>
           </label>
         ) : null}
+        <label className="block text-sm">
+          <span className="text-xs text-zinc-500 dark:text-zinc-400">Agrupar por</span>
+          <select
+            value={groupBy}
+            onChange={(e) => setGroupBy(e.target.value as 'none' | 'tag' | 'category')}
+            aria-label="Agrupar entradas"
+            className="mt-1 block rounded-md border border-zinc-300 bg-transparent px-2 py-1.5 text-sm dark:border-zinc-700 dark:[color-scheme:dark]"
+          >
+            <option value="none">sin agrupar</option>
+            <option value="tag">tag</option>
+            <option value="category">categoría</option>
+          </select>
+        </label>
         <div className="grow" />
         <button
           type="button"
@@ -363,51 +423,28 @@ export function KbManager({ initial, projects }: { initial: KbIndexEntry[]; proj
         </div>
       ) : null}
 
-      {/* Lista */}
+      {/* Lista (plana o agrupada por tag/categoría, Tarea 11) */}
       {visible.length === 0 ? (
         <p className="mt-6 text-sm text-zinc-500 dark:text-zinc-400">
           Sin entradas para este filtro.
         </p>
+      ) : grouped ? (
+        <div className="mt-4 space-y-5">
+          {grouped.map((g) => (
+            <div key={g.key}>
+              <h4 className="text-xs font-semibold uppercase tracking-wide text-zinc-500 dark:text-zinc-400">
+                {g.key === UNTAGGED_KEY ? '(sin etiqueta)' : g.key}{' '}
+                <span className="text-zinc-400">({g.entries.length})</span>
+              </h4>
+              <ul className="mt-1.5 divide-y divide-zinc-200 dark:divide-zinc-800">
+                {g.entries.map((e) => entryRow(e))}
+              </ul>
+            </div>
+          ))}
+        </div>
       ) : (
         <ul className="mt-4 divide-y divide-zinc-200 dark:divide-zinc-800">
-          {visible.map((e) => (
-            <li key={`${e.scope}-${e.slug}`} className="flex items-start justify-between gap-4 py-2.5">
-              <div className="min-w-0">
-                <p className="text-sm font-medium">
-                  {e.name}{' '}
-                  <span className={`ml-1 rounded px-1.5 py-0.5 text-[10px] ${e.category === 'reporte' ? 'bg-sky-100 text-sky-800 dark:bg-sky-950 dark:text-sky-300' : 'bg-zinc-100 text-zinc-600 dark:bg-zinc-900 dark:text-zinc-400'}`}>
-                    {CATEGORY_LABEL[e.category]}
-                  </span>{' '}
-                  <span className={`rounded px-1.5 py-0.5 text-[10px] ${e.scope === 'project' ? 'bg-emerald-100 text-emerald-800 dark:bg-emerald-950 dark:text-emerald-300' : 'bg-zinc-100 text-zinc-600 dark:bg-zinc-900 dark:text-zinc-400'}`}>
-                    {e.scope === 'project' ? `proyecto: ${project}` : 'global'}
-                  </span>
-                </p>
-                <p className="font-mono text-xs text-zinc-400">{e.slug}</p>
-                {e.description !== '' ? (
-                  <p className="mt-1 line-clamp-2 text-xs text-zinc-500 dark:text-zinc-400">{e.description}</p>
-                ) : null}
-                {e.tags.length > 0 ? (
-                  <p className="mt-1 font-mono text-[10px] text-zinc-400">#{e.tags.join(' #')}</p>
-                ) : null}
-              </div>
-              <div className="flex shrink-0 gap-2">
-                <button
-                  type="button"
-                  onClick={() => startEdit(e)}
-                  className="rounded-md border border-zinc-300 px-2 py-1 text-xs hover:bg-zinc-100 dark:border-zinc-700 dark:hover:bg-zinc-900"
-                >
-                  Editar
-                </button>
-                <button
-                  type="button"
-                  onClick={() => del(e)}
-                  className="rounded-md border border-red-300 px-2 py-1 text-xs text-red-600 hover:bg-red-50 dark:border-red-800 dark:text-red-400 dark:hover:bg-red-950"
-                >
-                  Borrar
-                </button>
-              </div>
-            </li>
-          ))}
+          {visible.map((e) => entryRow(e))}
         </ul>
       )}
     </div>
