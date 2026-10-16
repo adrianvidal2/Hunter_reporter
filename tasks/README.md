@@ -53,3 +53,7 @@ idempotencia y el camino feliz. Nada se marca como hecho con tests en rojo o par
 | 10a | Queries de correlación | ✅ hecho (correlation.ts read-only + 7 tests; validación final pendiente) |
 | 10b | Vista de correlación | ✅ hecho (/correlacion read-only + sidebar; validación final pendiente) |
 | 11 | Agrupar la KB por tag/categoría (facetado) | ✅ hecho (facet.ts puro + tags en editor + selector/grupos en /kb + 8 tests; validación final pendiente) |
+| 12 | **Auditoría completa orquestada** — epic (botón → recon → misión → agente; control del operador) | ✅ hecho (12a–12c completadas; validación final pendiente) |
+| 12a | Config de auditoría por proyecto (plantilla + agente + presupuesto + recon sí/no) | ✅ hecho (audit-config.ts + clamp + persistencia + 14 tests; validación final pendiente) |
+| 12b | Orquestador (recon confirmado → misión → agente; kill switch; prohibido no frena) | ✅ hecho (audit-orchestrator.ts + control del operador + 9 tests; validación final pendiente) |
+| 12c | UI «Auditoría completa» (con/sin recon + estado + kill switch) | ✅ hecho (audit-actions + panel + wiring + 7 tests; validación final pendiente) |
