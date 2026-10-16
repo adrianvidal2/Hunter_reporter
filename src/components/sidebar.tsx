@@ -11,6 +11,7 @@ const NAV = [
   { href: '/cvss', label: 'CVSS', exact: true },
   { href: '/escaneos', label: 'Escaneos', exact: false },
   { href: '/reportes', label: 'Reportes', exact: false },
+  { href: '/kb', label: 'Conocimiento', exact: false },
   { href: '/prompts', label: 'Prompts', exact: false },
   { href: '/ajustes', label: 'Ajustes', exact: false },
 ] as const

@@ -1,6 +1,5 @@
 'use server'
 
-import { readFileSync } from 'node:fs'
 import path from 'node:path'
 import { revalidatePath } from 'next/cache'
 import { getEnv } from '@/lib/env'
@@ -11,6 +10,7 @@ import { readProgramFile } from '@/core/ywh/program-file'
 import { loadOrcaSettings } from '@/core/orca/settings'
 import { createOrcaWorktreeRun, prepareOrcaRun, defaultExec } from '@/core/orca/runner'
 import { appendLaunch } from '@/server/launches'
+import { renderKbContext } from '@/core/kb/kb'
 import { type LaunchAgent } from '@/core/ywh/launch-form'
 
 /**
@@ -65,6 +65,23 @@ export async function launchProgramAction(input: LaunchProgramInput): Promise<La
     revalidatePath('/')
     revalidatePath(`/proyectos/${encodeURIComponent(input.project)}`)
     return { ok: true, relPath: rel }
+  } catch (err) {
+    return { ok: false, error: err instanceof Error ? err.message : 'Error inesperado' }
+  }
+}
+
+// ── Contexto KB para el wizard Lanzar (Tarea 6c) ──────────────────────
+
+/**
+ * Contexto markdown de las skills KB marcadas en el asistente (solo lectura;
+ * el ensamblado con el prompt lo hace el wizard con applyKbToPrompt).
+ */
+export async function renderKbContextAction(
+  slugs: string[],
+  project?: string,
+): Promise<{ ok: true; context: string } | { ok: false; error: string }> {
+  try {
+    return { ok: true, context: renderKbContext(slugs, { project: project || undefined }) }
   } catch (err) {
     return { ok: false, error: err instanceof Error ? err.message : 'Error inesperado' }
   }

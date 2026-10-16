@@ -3,6 +3,7 @@
 import { useState, useTransition } from 'react'
 import { generateRewriteAction, acceptRewriteAction } from '@/app/pendientes/actions'
 import { discardPendingAction } from '@/app/actions'
+import type { KbIndexEntry } from '@/core/kb/kb'
 import type { ReviewAnalysis } from '@/core/reports/review'
 import type { TemplateOption } from '@/core/reports/templates'
 import type { GenerateResult } from '@/server/generate-rewrite'
@@ -52,31 +53,42 @@ export function RewriteReview({
   path,
   templates,
   preselectedTemplate,
+  kbEntries = [],
   generate: generateProposal = generateRewriteAction,
 }: {
   path: string
   /** Selector de plantilla (10.1): sin él, usa el default (flujo Pendientes). */
   templates?: TemplateOption[]
   preselectedTemplate?: string
+  /** Índice KB 'reporte' (global+proyecto): el usuario marca y va como contexto. */
+  kbEntries?: KbIndexEntry[]
   /** Acción de generación (default: Pendientes; 10.1 pasa la de borradores). */
-  generate?: (path: string, templateName?: string) => Promise<GenerateResult>
+  generate?: (path: string, templateName?: string, kbSlugs?: string[]) => Promise<GenerateResult>
 }) {
   const [templateName, setTemplateName] = useState<string | undefined>(preselectedTemplate)
+  const [kbSelected, setKbSelected] = useState<Set<string>>(new Set())
   const [markdown, setMarkdown] = useState<string | null>(null)
   const [analysis, setAnalysis] = useState<ReviewAnalysis | null>(null)
   const [info, setInfo] = useState<string | null>(null)
   const [error, setError] = useState<string | null>(null)
-  const [showRawDiff, setShowRawDiff] = useState(false)
   const [ackLosses, setAckLosses] = useState(false)
   const [done, setDone] = useState<string | null>(null)
   const [pending, startTransition] = useTransition()
+
+  const toggleKb = (slug: string) =>
+    setKbSelected((prev) => {
+      const next = new Set(prev)
+      if (next.has(slug)) next.delete(slug)
+      else next.add(slug)
+      return next
+    })
 
   const generate = () =>
     startTransition(async () => {
       setError(null)
       setMarkdown(null)
       setAnalysis(null)
-      const res = await generateProposal(path, templateName)
+      const res = await generateProposal(path, templateName, kbSelected.size > 0 ? [...kbSelected] : undefined)
       if (!res.ok) {
         setError(res.error ?? 'Error inesperado')
         return
@@ -132,6 +144,38 @@ export function RewriteReview({
               ))}
             </select>
           </label>
+        ) : null}
+        {kbEntries.length > 0 ? (
+          <details className="rounded-md border border-zinc-300 text-xs dark:border-zinc-700">
+            <summary className="cursor-pointer select-none px-2 py-1 font-medium">
+              Conocimiento ({kbSelected.size} marcadas)
+            </summary>
+            <ul className="max-h-40 space-y-1 overflow-y-auto border-t border-zinc-200 p-2 dark:border-zinc-800">
+              {kbEntries.map((e) => (
+                <li key={`${e.scope}-${e.slug}`}>
+                  <label className="flex cursor-pointer items-start gap-1.5">
+                    <input
+                      type="checkbox"
+                      checked={kbSelected.has(e.slug)}
+                      onChange={() => toggleKb(e.slug)}
+                      className="mt-0.5 h-3.5 w-3.5"
+                    />
+                    <span className="min-w-0">
+                      <span className="font-mono">{e.slug}</span>
+                      <span
+                        className={`ml-1 rounded px-1 py-0.5 text-[10px] ${e.scope === 'project' ? 'bg-emerald-100 text-emerald-800 dark:bg-emerald-950 dark:text-emerald-300' : 'bg-zinc-100 text-zinc-600 dark:bg-zinc-900 dark:text-zinc-400'}`}
+                      >
+                        {e.scope === 'project' ? 'proyecto' : 'global'}
+                      </span>
+                      {e.description !== '' ? (
+                        <span className="block text-zinc-500 dark:text-zinc-400">{e.description}</span>
+                      ) : null}
+                    </span>
+                  </label>
+                </li>
+              ))}
+            </ul>
+          </details>
         ) : null}
         <button
           type="button"

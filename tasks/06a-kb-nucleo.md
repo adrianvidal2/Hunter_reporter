@@ -33,7 +33,15 @@ descubrimiento, carga bajo demanda y CRUD. Sin Next, sin red.
 - Colisión de slug (crear sobre existente) → error claro (estilo `PromptCollisionError`).
 - Borrado va a `.trash`, nunca `unlink`.
 
-## Validación (la hace reporter)
-- [ ] `npx vitest run src/core/kb/kb.test.ts` verde + suite completa sin regresiones.
-- [ ] `npx tsc --noEmit` y `npx eslint` limpios.
-- [ ] `listKbIndex` no filtra cuerpos; precedencia y aislamiento de ámbitos correctos.
+## Validación (comprobada 2026-10-15)
+- [x] Suite completa verde: **87 ficheros, 691 tests** (+15 de `kb.test.ts`), exit 0.
+- [x] `npx tsc --noEmit` sin errores; `npx eslint` limpio en los ficheros de la tarea.
+- [x] Cobertura del spec: CRUD en ambos ámbitos; update/rename→`.trash`; delete→`.trash`
+      (2ª vez `false`); precedencia proyecto>global en índice y carga; **aislamiento**
+      (proyecto A no aparece para B ni en global); `listKbIndex` devuelve SOLO metadatos y
+      filtra por `category`; dirs sin `SKILL.md` ignorados; `loadKbEntry` lista references +
+      `readKbReference` con rechazo de nombres no planos; `renderKbContext` concatena exacto /
+      `[]`→'' / slug ausente se salta / respeta precedencia; fm ausente→defaults; colisión de
+      slug; round-trip de comillas/barras.
+- [x] Usa tmpdir con `root` explícito: no toca `.config/` ni datos reales.
+- [x] Núcleo puro (sin UI) → no hay paso manual pendiente; validación completa.

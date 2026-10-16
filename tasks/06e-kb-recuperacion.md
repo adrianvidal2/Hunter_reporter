@@ -27,7 +27,20 @@ GraphRAG quedan como fases futuras (ver estudio).
 - Aislamiento: una búsqueda con `project` no devuelve KB de otro proyecto.
 - Query vacía / sin resultados → `[]` sin romper; term con sintaxis FTS rara no revienta.
 
-## Validación (la hace reporter)
-- [ ] Suite verde + exit 0; `npx tsc --noEmit` y `npx eslint` limpios.
-- [ ] Migración FTS5 aplica limpia (ejercida al abrir BD temporal en los tests).
-- [ ] `searchKb` recupera por término exacto con latencia sub-ms; índice reconstruible.
+## Validación (comprobada 2026-10-15)
+- [x] Suite completa verde: **89 ficheros, 719 tests** (+13 de `kb-index.test.ts`), exit 0.
+- [x] `npx tsc --noEmit` y `npx eslint` limpios.
+- [x] **Migración 0005 (FTS5)** aplica limpia — ejercida al abrir BD temporal; tabla virtual
+      `kb_fts` (slug/scope/category UNINDEXED; title/description/text indexados, pesos BM25 5/3/1).
+- [x] `rebuildKbIndex` puebla desde TODOS los ámbitos, es **reconstruible** (vaciar+repoblar →
+      idéntico), e indexa entradas sin cuerpo por title/description.
+- [x] `searchKb`: término exacto (CVE con guiones) vía fallback literal; sintaxis FTS5
+      (prefijos/AND); dedup por entrada; filtro `category`; **aislamiento** por `project`;
+      query vacía/sin resultados/sintaxis rota → `[]` sin romper; ranking título/desc > cuerpo.
+- [x] `chunkBody` (~350, por párrafos + corte duro). Usa tmpdir + dbPath: no toca datos reales.
+- [x] Núcleo/db puro (sin UI) → no hay paso manual pendiente; validación completa.
+
+### Nota honesta
+`searchKb`/`rebuildKbIndex` son el **motor** de recuperación, aún **sin consumidor** cableado
+(ningún código no-test lo llama todavía). Indexar `findings` quedó como extensión futura (la
+tarea lo marcaba opcional). Enganchar la búsqueda a agentes/reportes/triaje sería tarea aparte.

@@ -7,6 +7,7 @@ import { CopyButton } from './copy-button'
 import { LaunchWizard } from './launch-wizard'
 import { currencySymbol, rewardRows, type CvssLevel } from '@/core/ywh/reward'
 import type { PromptMeta } from '@/core/prompts/prompts'
+import type { KbIndexEntry } from '@/core/kb/kb'
 import type { Program } from '@/core/ywh/types'
 
 /**
@@ -39,10 +40,13 @@ export function ProjectProgramTab({
   program,
   project,
   prompts = [],
+  kbEntries = [],
 }: {
   program: Program | null
   project: string
   prompts?: PromptMeta[]
+  /** Índice KB 'tecnica' (global + proyecto) para el wizard Lanzar. */
+  kbEntries?: KbIndexEntry[]
 }) {
   const [wizardOpen, setWizardOpen] = useState(false)
   const [syncing, setSyncing] = useState(false)
@@ -151,6 +155,7 @@ export function ProjectProgramTab({
           project={project}
           program={program}
           prompts={prompts}
+          kbEntries={kbEntries}
           onClose={() => setWizardOpen(false)}
         />
       ) : null}

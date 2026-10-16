@@ -22,6 +22,7 @@ vi.mock('next/cache', () => ({ revalidatePath: vi.fn() }))
 
 import { generateDraftRewriteAction } from './actions'
 import { acceptRewriteAction } from '@/app/pendientes/actions'
+import { createKb } from '@/core/kb/kb'
 import { getPendingAction } from '@/db/pending'
 import { saveTemplate } from '@/core/reports/templates'
 
@@ -114,5 +115,41 @@ describe('generateDraftRewriteAction (10.1)', () => {
     } finally {
       ;(cfg as { settings: unknown }).settings = prev
     }
+  })
+
+  it('los slugs KB marcados llegan como kbContext al LLM; sin marcar → sin contexto (6d)', async () => {
+    saveTemplate('alt', '# ALT\n\n## Executive Summary\n\n{{resumen}}', fx.root, 'demo_project')
+    await createKb(
+      {
+        name: 'remediation-idor',
+        description: 'Remediación estándar de IDOR.',
+        category: 'reporte',
+        body: 'CUERPO-KB-REMEDIATION',
+      },
+      { scope: 'demo_project', root: fx.root },
+    )
+    vi.mocked(rewriteReport).mockResolvedValue({
+      ok: true,
+      markdown: '# Rewritten\n\n## Executive Summary\n\nx',
+      info: { attempts: 1, latencyMs: 5, model: 'test-model' },
+    })
+
+    await generateDraftRewriteAction(REL, 'alt', ['remediation-idor'])
+    const [, , withKb] = vi.mocked(rewriteReport).mock.calls[0] as unknown as [
+      string,
+      string,
+      { kbContext?: string },
+    ]
+    expect(withKb.kbContext).toContain('CUERPO-KB-REMEDIATION')
+
+    // sin marcar → SIN contexto: la reescritura es la de siempre
+    vi.mocked(rewriteReport).mockClear()
+    await generateDraftRewriteAction(REL, 'alt')
+    const [, , withoutKb] = vi.mocked(rewriteReport).mock.calls[0] as unknown as [
+      string,
+      string,
+      { kbContext?: string },
+    ]
+    expect(withoutKb.kbContext).toBe('')
   })
 })

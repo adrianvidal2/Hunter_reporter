@@ -2,6 +2,7 @@ import { readFile } from 'node:fs/promises'
 import { PathEscapeError, resolveSafe } from '@/core/fs/paths'
 import { rewriteReport } from '@/core/llm/rewrite'
 import { loadLlmSettings } from '@/core/llm/settings'
+import { renderKbContext } from '@/core/kb/kb'
 import { analyzeRewrite, type ReviewAnalysis } from '@/core/reports/review'
 import { DEFAULT_TEMPLATE_NAME, findTemplate } from '@/core/reports/templates'
 import { recordLlmRun } from '@/db/runs'
@@ -38,6 +39,8 @@ export async function generateRewriteFor(
   path: string,
   templateName: string = DEFAULT_TEMPLATE_NAME,
   hooks: GenerateHooks = {},
+  /** Slugs KB ('reporte') elegidos en la UI: contexto blindado para el LLM. */
+  kbSlugs: string[] = [],
 ): Promise<GenerateResult> {
   const settings = loadLlmSettings()
   if (!settings || !settings.apiKey) {
@@ -63,10 +66,16 @@ export async function generateRewriteFor(
 
   hooks.onBeforeLlm?.(path)
 
+  // Contexto KB (skills 'reporte'): solo lo elegido; el contenido es DATO
+  // y va blindado en el prompt (delimitadores + nonce en prompt.ts).
+  const kbContext =
+    kbSlugs.length > 0 ? renderKbContext(kbSlugs, { project, root: getEnv().REPORTS_ROOT }) : ''
+
   const res = await rewriteReport(original, hit.content, {
     baseUrl: settings.baseUrl,
     apiKey: settings.apiKey,
     model: settings.model,
+    kbContext,
   })
 
   // 8.9: registrar la ejecución (éxito o fallo) con tokens, duración y coste

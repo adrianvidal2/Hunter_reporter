@@ -3,6 +3,7 @@ import { ProjectTabs } from '@/components/project-tabs'
 import { listProject, listProjects } from '@/core/fs/tree'
 import { readProjectProgram } from '@/core/ywh/program-file'
 import { listPrompts } from '@/core/prompts/prompts'
+import { listKbIndex } from '@/core/kb/kb'
 import { buildScansView } from '@/server/scans'
 import { getEnv } from '@/lib/env'
 
@@ -22,6 +23,8 @@ export default async function ProyectoDetallePage({
   const program = readProjectProgram(project, root)
   // Prompts globales para el PASO 2 del wizard Lanzar (reutiliza el loader).
   const prompts = listPrompts(root)
+  // Índice KB 'tecnica' (global + ESTE proyecto) para el wizard Lanzar.
+  const kbEntries = listKbIndex({ project, category: 'tecnica', root })
   // Pestaña Escaneos: agentes de ESTE proyecto, estado EN VIVO al abrir.
   const scans = (await buildScansView(root, { project })).rows
   return (
@@ -30,6 +33,7 @@ export default async function ProyectoDetallePage({
       projects={listProjects(root)}
       program={program}
       prompts={prompts}
+      kbEntries={kbEntries}
       scans={scans}
     />
   )

@@ -22,7 +22,14 @@ prompt, vía el índice de descripciones (el usuario elige qué entradas).
   entradas EXACTAMENTE marcadas; sin marcar → prompt intacto.
 - Que las entradas de proyecto solo salen para ESE proyecto (aislamiento, apoyado en 06a).
 
-## Validación (la hace reporter)
-- [ ] Suite verde + exit 0; `tsc`/`eslint` limpios.
-- [ ] Manual: marcar 1-2 skills `tecnica` en el Lanzar → el prompt enviado al agente las
-      incluye; sin marcar nada, el prompt no cambia.
+## Validación (comprobada 2026-10-15)
+- [x] Suite completa verde: **88 ficheros, 701 tests** (+5), exit 0; `tsc --noEmit` y `eslint` limpios.
+- [x] Lógica pura `applyKbToPrompt` (launch-form): sin contexto → prompt INTACTO byte a byte;
+      con contexto → base + separador + skills; no duplica el salto final; igual para todos los
+      agentes (agnóstico). `renderKbContextAction` devuelve el contexto de lo EXACTAMENTE marcado.
+- [x] Threading real verificado: `page.tsx` carga `listKbIndex({project, category:'tecnica'})`
+      → `project-tabs` → `project-program-tab` → `LaunchWizard` (`kbEntries`); el wizard marca
+      slugs y en confirmar hace `renderKbContextAction` + `applyKbToPrompt` por agente.
+- [ ] **Manual pendiente** (`pnpm dev`): marcar 1-2 skills `tecnica` en el Lanzar → el prompt
+      del agente las incluye; sin marcar, el prompt no cambia. (Verificado por lectura + tests;
+      el wizard no tiene test unitario.)

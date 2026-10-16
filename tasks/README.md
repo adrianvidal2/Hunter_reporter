@@ -29,9 +29,9 @@ idempotencia y el camino feliz. Nada se marca como hecho con tests en rojo o par
 | 3 | Vista de findings (nuclei) | ✅ hecho (parser + tabla findings + borrador + 19 tests; validación final pendiente) |
 | 4 | Clasificador LLM (aparcado) | ✅ hecho (triaje + pre-filtro + anti-inyección + 20 tests; validación final pendiente) |
 | 5 | Higiene (EPIPE, aislar `.settings`, limpiar `dbg`) | ✅ hecho (5.1 en Tarea 2 + test regresión; 5.2 verificado con checksums; 5.3 `dbg*`/`v.mts.run` eliminados) |
-| 6 | **Base de conocimiento (KB)** — epic (`SKILL.md`, 2 ámbitos, discovery por índice) | ⬜ partido en 6a–6d |
-| 6a | Núcleo KB (`core/kb/kb.ts`) | ⬜ pendiente |
-| 6b | Página «Conocimiento» (UI + actions) | ⬜ pendiente (dep. 6a) |
-| 6c | Consumidor agentes (adjuntar `tecnica` al prompt) | ⬜ pendiente (dep. 6a) |
-| 6d | Consumidor reportes (insertar `reporte`) | ⬜ pendiente (dep. 6a) |
-| 6e | Recuperación KB (FTS5 sobre `reporter.db`) | ⬜ pendiente (dep. 6a; estudio: `docs/kb-retrieval-study.md`) |
+| 6 | **Base de conocimiento (KB)** — epic (`SKILL.md`, 2 ámbitos, discovery por índice) | ✅ hecho (6a–6e completadas; validación final pendiente) |
+| 6a | Núcleo KB (`core/kb/kb.ts`) | ✅ hecho (CRUD 2 ámbitos + índice + render + 15 tests; validación final pendiente) |
+| 6b | Página «Conocimiento» (UI + actions) | ✅ hecho (actions + /kb + gestor + sidebar + 5 tests; validación final pendiente) |
+| 6c | Consumidor agentes (adjuntar `tecnica` al prompt) | ✅ hecho (sección Conocimiento en wizard + applyKbToPrompt + renderKbContextAction + 5 tests; validación final pendiente) |
+| 6d | Consumidor reportes (insertar `reporte`) | ✅ hecho (selector en reescritura + bloque CONOCIMIENTO_KB blindado + 8 tests; validación final pendiente) |
+| 6e | Recuperación KB (FTS5 sobre `reporter.db`) | ✅ hecho (migración FTS5 + rebuild/search BM25 + 13 tests; validación final pendiente) |

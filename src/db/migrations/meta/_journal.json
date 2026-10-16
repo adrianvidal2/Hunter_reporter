@@ -36,6 +36,13 @@
       "when": 1792011363017,
       "tag": "0004_clean_ricochet",
       "breakpoints": true
+    },
+    {
+      "idx": 5,
+      "version": "6",
+      "when": 1792094687578,
+      "tag": "0005_kb_fts",
+      "breakpoints": true
     }
   ]
 }

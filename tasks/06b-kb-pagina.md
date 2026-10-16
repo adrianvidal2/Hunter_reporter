@@ -23,8 +23,14 @@ Núcleo de 06a; patrón de `prompts-manager.tsx` y `app/prompts/actions.ts`.
   borrar/listar en ambos ámbitos; errores propagados (colisión, no-existe); nada toca datos reales.
 - (UI sin test unitario: cubrir por `tsc`/`eslint` + validación manual, como el resto de paneles.)
 
-## Validación (la hace reporter)
-- [ ] Suite verde + exit 0; `npx tsc --noEmit` y `npx eslint` limpios.
-- [ ] Manual (`pnpm dev`): `/kb` crea/edita/borra entradas global y de proyecto con categoría
-      y `description`; la entrada aparece en el índice con su ámbito.
-- [ ] El sidebar muestra «Conocimiento» y no rompe la navegación existente.
+## Validación (comprobada 2026-10-15)
+- [x] Suite completa verde: **88 ficheros, 696 tests** (+5 de `app/kb/actions.test.ts`), exit 0.
+- [x] `npx tsc --noEmit` sin errores; `npx eslint` limpio (actions, test, page, kb-manager, sidebar).
+- [x] Actions: el servidor VALIDA el ámbito (`global` o proyecto existente) antes de escribir;
+      `Res<T>`; cobertura de list (global/proyecto/scope inexistente→error), create/update en
+      ambos ámbitos + colisión + scope inválido rechazado antes de escribir, rename→colisión/
+      not-found, delete (true→false) a `.trash` + loadEntry con cuerpo/references.
+- [x] Sidebar: entrada «Conocimiento» → `/kb` (no rompe tipos/lint de la navegación).
+- [ ] **Manual pendiente** (`pnpm dev`): en `/kb` crear/editar/borrar entradas global y de
+      proyecto con categoría y `description`, y verlas en el índice con su ámbito. (Verificado
+      por lectura + tests de actions; la UI `kb-manager.tsx` no tiene test unitario.)

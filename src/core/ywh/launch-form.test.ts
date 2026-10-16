@@ -5,6 +5,7 @@ import { join } from 'node:path'
 import type { PromptMeta } from '@/core/prompts/prompts'
 import {
   agentsFromCounts,
+  applyKbToPrompt,
   buildLaunchDraft,
   bumpProvider,
   DEFAULT_LAUNCH_MODE,
@@ -198,5 +199,32 @@ describe('ORCA_AGENT_BY_PROVIDER (mapeo proveedor → id de agente Orca)', () =>
     expect(orcaAgentForProvider('Zcode')).toBe('zcode') // id por confirmar
     expect(orcaAgentForProvider('Deepseek')).toBe('deepseek') // id por confirmar
     expect(orcaAgentForProvider('Proveedor inválido')).toBe('')
+  })
+})
+
+describe('applyKbToPrompt (adjuntar skills técnicas al prompt, Tarea 6c)', () => {
+  const BASE = 'Busca XSS en el scope marcado.'
+  const CTX = '## Skill: sqli-playbook [tecnica]\n\nPasos de SQLi.'
+
+  it('sin contexto (nada marcado) → prompt INTACTO, byte a byte', () => {
+    expect(applyKbToPrompt(BASE, '')).toBe(BASE)
+    expect(applyKbToPrompt(BASE, '   \n\n  ')).toBe(BASE) // solo espacios
+  })
+
+  it('con contexto → prompt base + separador + skills, en ese orden', () => {
+    expect(applyKbToPrompt(BASE, CTX)).toBe(`${BASE}\n\n---\n\n${CTX}`)
+  })
+
+  it('el salto final del prompt base no se duplica al adjuntar', () => {
+    expect(applyKbToPrompt(`${BASE}\n\n`, CTX)).toBe(`${BASE}\n\n---\n\n${CTX}`)
+  })
+
+  it('el contexto pasa por TODOS los agentes igual (agnóstico del agente)', () => {
+    const agents = [
+      { provider: 'pi', prompt: BASE, label: 'Pi #1' },
+      { provider: 'claude', prompt: 'otro prompt', label: 'Claude #1' },
+    ]
+    const withKb = agents.map((a) => ({ ...a, prompt: applyKbToPrompt(a.prompt, CTX) }))
+    expect(withKb.map((a) => a.prompt)).toEqual([`${BASE}\n\n---\n\n${CTX}`, `otro prompt\n\n---\n\n${CTX}`])
   })
 })

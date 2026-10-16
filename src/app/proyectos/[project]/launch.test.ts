@@ -1,4 +1,4 @@
-import { readFileSync } from 'node:fs'
+import { mkdirSync, readFileSync, writeFileSync } from 'node:fs'
 import path from 'node:path'
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 import { createFixture, type Fixture } from '../../../test/fixtures/fixture'
@@ -25,12 +25,12 @@ vi.mock('@/core/orca/runner', () => ({
   },
 }))
 
-import { launchOrcaAction, launchProgramAction } from './launch'
+import { launchOrcaAction, launchProgramAction, renderKbContextAction } from './launch'
+import { createKb } from '@/core/kb/kb'
 
 /** Escribe un programa.json realista en el proyecto del fixture. */
 function writeProgramJson(fx: Fixture, accountAccess?: string | null) {
   const projDir = path.join(fx.root, 'demo_project')
-  const { mkdirSync, writeFileSync } = require('node:fs')
   mkdirSync(projDir, { recursive: true })
   const program = {
     pid: 'x',
@@ -230,6 +230,49 @@ describe('launchOrcaAction · lote de agtentes', () => {
     expect(launches.launches).toHaveLength(3)
     expect(launches.launches.filter((l: { ok: boolean }) => !l.ok)).toHaveLength(1)
     expect(launches.launches.filter((l: { ok: boolean }) => !l.ok)[0]!.error).toMatch(/id de agente no válido/i)
+    fx.cleanup()
+  })
+})
+
+describe('renderKbContextAction (skills KB para el wizard Lanzar, Tarea 6c)', () => {
+  it('devuelve el contexto de las entradas EXACTAMENTE marcadas; [] → vacío', async () => {
+    const fx = createFixture()
+    env.root = fx.root
+    await createKb(
+      { name: 'sqli-playbook', description: 'Pasos de SQLi.', category: 'tecnica', body: 'CUERPO-SQLI' },
+      { scope: 'global', root: fx.root },
+    )
+    await createKb(
+      { name: 'idor-de-demo', description: 'IDOR específico de demo.', category: 'tecnica', body: 'CUERPO-IDOR-DEMO' },
+      { scope: 'demo_project', root: fx.root },
+    )
+    await createKb(
+      { name: 'idor-de-otro', description: 'IDOR de OTRO proyecto.', category: 'tecnica', body: 'CUERPO-OTRO' },
+      { scope: 'otro_project', root: fx.root },
+    )
+
+    // solo lo marcado, en orden
+    const both = await renderKbContextAction(['idor-de-demo', 'sqli-playbook'], 'demo_project')
+    expect(both.ok).toBe(true)
+    if (both.ok) {
+      expect(both.context).toContain('CUERPO-IDOR-DEMO')
+      expect(both.context).toContain('CUERPO-SQLI')
+      expect(both.context.indexOf('CUERPO-IDOR-DEMO')).toBeLessThan(both.context.indexOf('CUERPO-SQLI'))
+    }
+
+    // aisLAMIENTO: la entrada de OTRO proyecto no sale para demo_project
+    const solo = await renderKbContextAction(['idor-de-otro'], 'demo_project')
+    expect(solo.ok).toBe(true)
+    if (solo.ok) expect(solo.context).toBe('') // no existe para este proyecto
+
+    // sin proyecto, solo global
+    const globalOnly = await renderKbContextAction(['idor-de-demo'])
+    expect(globalOnly.ok).toBe(true)
+    if (globalOnly.ok) expect(globalOnly.context).toBe('')
+
+    // [] → cadena vacía
+    const empty = await renderKbContextAction([], 'demo_project')
+    expect(empty.ok && empty.context).toBe('')
     fx.cleanup()
   })
 })
