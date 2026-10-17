@@ -58,3 +58,4 @@ idempotencia y el camino feliz. Nada se marca como hecho con tests en rojo o par
 | 12b | Orquestador (recon confirmado → misión → agente; kill switch; prohibido no frena) | ✅ hecho (audit-orchestrator.ts + control del operador + 9 tests; validación final pendiente) |
 | 12c | UI «Auditoría completa» (con/sin recon + estado + kill switch) | ✅ hecho (audit-actions + panel + wiring + 7 tests; validación final pendiente) |
 | 13 | Barra de progreso (auditoría 3 fases + pipeline por etapa) | ✅ hecho (progress.ts puro + ProgressBar + wiring en audit/pipeline + 14 tests; validación final pendiente) |
+| 14 | Findings: vista tabla ↔ tarjetas + detalle (toggle, preferencia recordada) | ✅ hecho (finding-view puro + FindingCard/FindingDetail + toggle persistido + 10 tests; validación final pendiente) |

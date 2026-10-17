@@ -9,6 +9,15 @@ import {
   type FindingDTO,
 } from '@/app/escaneos/recon-actions'
 import { FINDING_SEVERITIES, type FindingSeverity } from '@/core/recon/findings'
+import {
+  DEFAULT_FINDING_VIEW,
+  FINDING_VIEW_STORAGE_KEY,
+  normalizeViewMode,
+  sortBySeverity,
+  type FindingViewMode,
+} from '@/core/recon/finding-view'
+import { FindingCard } from '@/components/finding-card'
+import { FindingDetail } from '@/components/finding-detail'
 
 /**
  * Tabla de findings del proyecto (Tarea 3): el índice se SINCRONIZA desde
@@ -35,6 +44,9 @@ export function ReconFindingsSection({ project }: { project: string }) {
   const [error, setError] = useState<string | null>(null)
   const [busy, setBusy] = useState(false)
   const [severityFilter, setSeverityFilter] = useState<'all' | FindingSeverity>('all')
+  // Modo de vista persistido en localStorage (Tarea 14); SSR-safe: se lee en el efecto
+  const [viewMode, setViewMode] = useState<FindingViewMode>(DEFAULT_FINDING_VIEW)
+  const [detail, setDetail] = useState<FindingDTO | null>(null)
   const [note, setNote] = useState<{ ok: boolean; msg: string } | null>(null)
   const [triaging, setTriaging] = useState(false)
 
@@ -86,6 +98,27 @@ export function ReconFindingsSection({ project }: { project: string }) {
     }
   }, [project])
 
+  // preferencia de vista: localStorage (solo cliente, tras el montaje);
+  // setState dentro del callback de la promesa, nunca sincrono en el effect
+  useEffect(() => {
+    let saved: string | null = null
+    try {
+      saved = window.localStorage.getItem(FINDING_VIEW_STORAGE_KEY)
+    } catch {
+      /* sin localStorage: default */
+    }
+    void Promise.resolve(saved).then((raw) => setViewMode(normalizeViewMode(raw)))
+  }, [])
+
+  const changeViewMode = (mode: FindingViewMode) => {
+    setViewMode(mode)
+    try {
+      window.localStorage.setItem(FINDING_VIEW_STORAGE_KEY, mode)
+    } catch {
+      /* modo solo en memoria */
+    }
+  }
+
   const createDraft = (f: FindingDTO) => {
     setNote(null)
     void createFindingDraftAction(project, {
@@ -126,13 +159,32 @@ export function ReconFindingsSection({ project }: { project: string }) {
     })
   }
 
-  const visible = (findings ?? []).filter((f) => severityFilter === 'all' || f.severity === severityFilter)
+  const visible = sortBySeverity(
+    (findings ?? []).filter((f) => severityFilter === 'all' || f.severity === severityFilter),
+  )
 
   return (
     <section aria-label="Findings de recon" className="rounded-md border border-zinc-200 p-4 dark:border-zinc-800">
       <div className="flex flex-wrap items-center justify-between gap-2">
         <h3 className="text-sm font-semibold">Findings (salida estructurada, nuclei primero)</h3>
         <div className="flex items-center gap-2">
+          <div className="flex overflow-hidden rounded-md border border-zinc-300 text-xs dark:border-zinc-700" role="group" aria-label="Vista de findings">
+            {(['tabla', 'tarjetas'] as const).map((mode) => (
+              <button
+                key={mode}
+                type="button"
+                onClick={() => changeViewMode(mode)}
+                aria-pressed={viewMode === mode}
+                className={`px-2.5 py-1 transition-colors ${
+                  viewMode === mode
+                    ? 'bg-zinc-900 font-medium text-zinc-50 dark:bg-zinc-100 dark:text-zinc-900'
+                    : 'hover:bg-zinc-50 dark:hover:bg-zinc-900'
+                }`}
+              >
+                {mode === 'tabla' ? '☰ Tabla' : '▦ Tarjetas'}
+              </button>
+            ))}
+          </div>
           <select
             value={severityFilter}
             onChange={(e) => setSeverityFilter(e.target.value as 'all' | FindingSeverity)}
@@ -184,7 +236,37 @@ export function ReconFindingsSection({ project }: { project: string }) {
         El triaje del LLM PRE-MARCA y queda en el log de ejecuciones; nunca borra. Ante la duda: dudoso.
       </p>
 
-      {visible.length > 0 ? (
+      {detail ? (
+        <FindingDetail
+          finding={detail}
+          project={project}
+          onClose={() => setDetail(null)}
+          onCreateDraft={(f) => {
+            createDraft(f)
+            setDetail(null)
+          }}
+          onPromote={(f) => {
+            promote(f)
+            setDetail(null)
+          }}
+        />
+      ) : null}
+
+      {visible.length > 0 && viewMode === 'tarjetas' ? (
+        <div className="mt-3 grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-3">
+          {visible.map((f) => (
+            <FindingCard
+              key={`${f.templateId}-${f.host}`}
+              finding={f}
+              onOpen={setDetail}
+              onCreateDraft={createDraft}
+              onPromote={promote}
+            />
+          ))}
+        </div>
+      ) : null}
+
+      {visible.length > 0 && viewMode === 'tabla' ? (
         <div className="mt-3 overflow-x-auto">
           <table className="w-full text-left text-xs">
             <thead className="text-zinc-500 dark:text-zinc-400">
