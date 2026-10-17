@@ -122,7 +122,13 @@ export function ReportsList({
 
   // Estado del arrastre de resize: ref mutable + booster de render.
   const resizeRef = useRef<{ key: ReportSortKey; startX: number; startW: number; moved: boolean } | null>(null)
-  const [, forceTick] = useState(0)
+  const [resizing, setResizing] = useState(false)
+  // "hace X" en vivo sin llamar a Date.now() en render (react-hooks/purity)
+  const [now, setNow] = useState(() => Date.now())
+  useEffect(() => {
+    const t = setInterval(() => setNow(Date.now()), 30_000)
+    return () => clearInterval(t)
+  }, [])
 
   // Opciones de estado DERIVADAS de la cache.
   const stateOptions = useMemo(() => reportStateOptions(items), [items])
@@ -171,7 +177,7 @@ export function ReportsList({
     }
     const onUp = () => {
       resizeRef.current = null
-      forceTick((n) => n + 1)
+      setResizing(false)
     }
     window.addEventListener('pointermove', onMove)
     window.addEventListener('pointerup', onUp)
@@ -179,14 +185,14 @@ export function ReportsList({
       window.removeEventListener('pointermove', onMove)
       window.removeEventListener('pointerup', onUp)
     }
-  }, [resizeRef.current !== null])
+  }, [resizing])
 
   const startResize = (e: React.PointerEvent, key: ReportSortKey) => {
     e.preventDefault() // no iniciar selección de texto ni scroll
     e.stopPropagation() // no disparar el clic de orden
     const startW = widths[key]
     resizeRef.current = { key, startX: e.clientX, startW, moved: false }
-    forceTick((n) => n + 1)
+    setResizing(true)
   }
 
   const gridTemplate = widths
@@ -252,7 +258,7 @@ export function ReportsList({
       <div className="flex flex-wrap items-center justify-between gap-2">
         <p className="text-sm text-zinc-500 dark:text-zinc-400">
           {items.length} reportes{stateFilter !== '' ? ` · ${visible.length} en «${reportStateLabel(stateFilter)}»` : ''}
-          {at != null ? ` · actualizado ${fmtAge(Date.now() - at)}` : ''}
+          {at != null ? ` · actualizado ${fmtAge(now - at)}` : ''}
         </p>
         <div className="flex items-center gap-2">
           {stateOptions.length > 0 ? (

@@ -1,4 +1,4 @@
-import { existsSync, mkdtempSync, readFileSync, rmSync } from 'node:fs'
+import { existsSync, mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import { afterAll, beforeEach, describe, expect, it, vi } from 'vitest'
@@ -26,7 +26,6 @@ const fresh = () => join(dir, `case-${caseN++}`)
 const SAMPLE = { id: 1, local_id: 'YWH-1', title: 'Rep', scope: '', program: null, status: { workflow_state: 'under_review' }, cvss: null, hunter: null, reward: null, cost_credits: null, currency: null, marked_as: 'R', collaborative: false, created_at: '2026-08-20T17:44:34+02:00', changed_at: null, ask_for_fix_verification_status: 'UNKNOWN' }
 
 function writeJson(items: unknown, savedAt: number) {
-  const { mkdirSync, writeFileSync } = require('node:fs')
   mkdirSync(join(env.root, '.config'), { recursive: true })
   writeFileSync(join(env.root, '.config', 'reports-cache.json'), JSON.stringify({ savedAt, items }))
 }
