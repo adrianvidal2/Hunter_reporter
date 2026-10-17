@@ -6,6 +6,9 @@
 # ── Build y dependencias ─────────────────────────────────────────────────────
 .next/
 node_modules/
+# Cache de build de TS/Next (regenerados; no se versionan)
+tsconfig.tsbuildinfo
+next-env.d.ts
 # Índice SQLite (reconstruible: pnpm run db:reset)
 reporter.db
 *.db
