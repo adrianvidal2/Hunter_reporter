@@ -12,7 +12,7 @@ const detailFixture = JSON.parse(readFileSync(path.join(fixtures, 'program-detai
 
 const sleep = vi.fn().mockResolvedValue(undefined)
 const now = vi.fn(() => NOW)
-let NOW = 1_000_000
+const NOW = 1_000_000
 
 const makeClient = (fetchImpl: typeof fetch, token: { jwt: string; source: 'env' } | null = null) =>
   new YwhClient(token, { fetchImpl: fetchImpl as unknown as typeof fetch, sleepImpl: sleep, nowMs: now, timeoutMs: 5_000 })

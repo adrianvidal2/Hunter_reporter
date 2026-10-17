@@ -16,6 +16,8 @@
  * sin crear git de verdad.
  */
 
+import { execFile } from 'node:child_process'
+
 export interface GitExecResult {
   stdout: string
   stderr: string
@@ -119,7 +121,6 @@ export async function ensureGitRepo(
 
 /** Runner real de git (execFile sobre binario `git`). */
 function defaultGitExec(): GitExec {
-  const { execFile } = require('node:child_process') as typeof import('node:child_process')
   return (args, cwd) =>
     new Promise((resolve) => {
       execFile('git', args, { timeout: 60_000, cwd }, (err, stdout, stderr) => {

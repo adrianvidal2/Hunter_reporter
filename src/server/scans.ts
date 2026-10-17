@@ -1,4 +1,5 @@
 import { existsSync } from 'node:fs'
+import path from 'node:path'
 import { getEnv } from '@/lib/env'
 import { listProjects } from '@/core/fs/tree'
 import { loadOrcaSettings } from '@/core/orca/settings'
@@ -134,9 +135,7 @@ export async function buildScansView(
 }
 
 function includesProject(root: string, project: string): boolean {
-  const { join } = require('node:path') as typeof import('node:path')
-  const { existsSync } = require('node:fs') as typeof import('node:fs')
-  return existsSync(join(root, project))
+  return existsSync(path.join(root, project))
 }
 
 /** Handle de terminal para un launch: agentTerminalHandle > handle. */

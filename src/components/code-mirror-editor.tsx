@@ -21,7 +21,10 @@ export function CodeMirrorEditor({
 }) {
   const host = useRef<HTMLDivElement>(null)
   const onChangeRef = useRef(onChange)
-  onChangeRef.current = onChange
+  // mantener el ref con el último onChange SIN escribirlo en render (react-hooks/refs)
+  useEffect(() => {
+    onChangeRef.current = onChange
+  })
 
   useEffect(() => {
     const view = new EditorView({

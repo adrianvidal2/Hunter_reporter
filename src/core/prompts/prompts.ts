@@ -80,7 +80,7 @@ function normalizeSlug(slug: string): string {
   if (/[/\\]/.test(slug) || slug.includes('..')) {
     throw new InvalidPromptNameError(slug, 'separadores o ".." no permitidos')
   }
-  let out = slug.toLowerCase()
+  const out = slug.toLowerCase()
   if (!/^[a-z0-9-]+$/.test(out)) {
     throw new InvalidPromptNameError(slug, 'solo [a-z0-9-]'
       )

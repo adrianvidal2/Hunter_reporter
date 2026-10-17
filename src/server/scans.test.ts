@@ -29,7 +29,6 @@ function writeLaunch(project: string, rec: Record<string, unknown>) {
 
 describe('buildScansView (estado EN VIVO, nunca cacheado)', () => {
   beforeEach(() => {
-    const { rmSync } = require('node:fs')
     try { rmSync(root, { recursive: true }); } catch {}
     mkdirSync(root, { recursive: true })
     env.root = root

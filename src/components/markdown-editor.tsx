@@ -40,14 +40,18 @@ export default function MarkdownEditor({
   // Refs espejo: el scheduler y el listener de teclado necesitan los valores
   // actuales sin re-registrarse en cada tecla.
   const contentRef = useRef(content)
-  contentRef.current = content
   const mtimeRef = useRef(baselineMtime)
-  mtimeRef.current = baselineMtime
   const savedContentRef = useRef(savedContent)
-  savedContentRef.current = savedContent
   const conflictRef = useRef(conflict)
-  conflictRef.current = conflict
   const savingRef = useRef(false)
+  // refs espejo actualizados SIN escribir en render (react-hooks/refs); solo
+  // se leen en callbacks async (save, scheduler, Ctrl+S), nunca durante el render.
+  useEffect(() => {
+    contentRef.current = content
+    mtimeRef.current = baselineMtime
+    savedContentRef.current = savedContent
+    conflictRef.current = conflict
+  })
 
   const dirty = content !== savedContent
 
@@ -81,7 +85,9 @@ export default function MarkdownEditor({
   // 4.9: autoguardado con debounce de 1,5 s — el scheduler se crea una vez
   const schedulerRef = useRef<AutosaveScheduler | null>(null)
   const saveRef = useRef(save)
-  saveRef.current = save
+  useEffect(() => {
+    saveRef.current = save
+  })
   useEffect(() => {
     const scheduler = createAutosaveScheduler(() => {
       void saveRef.current()

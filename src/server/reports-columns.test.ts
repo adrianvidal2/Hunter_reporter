@@ -1,4 +1,4 @@
-import { mkdtempSync, readFileSync, rmSync } from 'node:fs'
+import { mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import { afterAll, beforeEach, describe, expect, it, vi } from 'vitest'
@@ -67,7 +67,6 @@ describe('persistencia en .config/reports-columns.json', () => {
   })
 
   it('corrupto → null', () => {
-    const { mkdirSync, writeFileSync } = require('node:fs')
     mkdirSync(join(root, 'corrupto', '.config'), { recursive: true })
     writeFileSync(join(root, 'corrupto', '.config', 'reports-columns.json'), 'no-json')
     env.root = join(root, 'corrupto')

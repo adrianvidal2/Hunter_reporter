@@ -38,7 +38,15 @@ export function IntigritiProgramsTab({ localProjects }: { localProjects: string[
     })
   }
 
-  useEffect(load, []) // carga solo al pulsar la subpestana (montaje diferido)
+  // montaje diferido: ya partimos de 'loading'; sin setState síncrono en el
+  // effect (react-hooks/set-state-in-effect), solo disparamos la carga. El botón usa load().
+  useEffect(() => {
+    void getIntigritiProgramsAction().then((res) => {
+      if (res.ok) setState({ phase: 'ok', programs: res.programs })
+      else if (res.reason === 'no-token') setState({ phase: 'no-token' })
+      else setState({ phase: 'error', error: res.error, authProblem: res.authProblem ?? false })
+    })
+  }, [])
 
   const [query, setQuery] = useState('')
   const [visF, setVisF] = useState<VisibilityFilter>('all')
@@ -64,11 +72,8 @@ export function IntigritiProgramsTab({ localProjects }: { localProjects: string[
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState<string | null>(null)
   const cache = useRef(new Map<string, NeutralProgramDetail>())
-  const existing = useRef(new Set<string>())
-
-  useEffect(() => {
-    for (const p of localProjects) existing.current.add(p)
-  }, [localProjects])
+  // conjunto de proyectos locales DERIVADO (no un ref): legible en render
+  const existing = useMemo(() => new Set(localProjects), [localProjects])
 
   const selectedId = detail?.id ?? null
 
@@ -79,7 +84,7 @@ export function IntigritiProgramsTab({ localProjects }: { localProjects: string[
       setError(null)
       return
     }
-    let cancelled = false
+    const cancelled = false
     setLoading(true)
     setError(null)
     setDetail(null)
@@ -239,7 +244,7 @@ export function IntigritiProgramsTab({ localProjects }: { localProjects: string[
             <ProgramDetail
               program={detail}
               platform="intigriti"
-              existingProject={existing.current.has(detail.slug) ? detail.slug : undefined}
+              existingProject={existing.has(detail.slug) ? detail.slug : undefined}
             />
           ) : null}
         </div>
