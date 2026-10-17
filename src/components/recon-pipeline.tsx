@@ -8,6 +8,8 @@ import {
   startPipelineAction,
   type PipelinePlanDTO,
 } from '@/app/escaneos/recon-actions'
+import { pipelineProgress } from '@/core/recon/progress'
+import { ProgressBar } from '@/components/progress-bar'
 import type { PipelineSnapshot } from '@/server/recon-pipeline'
 
 /**
@@ -81,6 +83,12 @@ export function ReconPipelineSection({ project, onRunsChanged }: { project: stri
   const stages = plan?.ok ? (plan.stages ?? []) : []
   const orderedSelected = stages.filter((s) => selected.has(s.toolId)).map((s) => s.toolId)
   const anyGatedSelected = stages.some((s) => selected.has(s.toolId) && s.gated)
+
+  // Barra de progreso (Tarea 13): una etapa por herramienta lanzada
+  const progressSegments =
+    snapshot && orderedSelected.length > 0
+      ? pipelineProgress(snapshot, orderedSelected, Object.fromEntries(stages.map((s) => [s.toolId, s.label])))
+      : null
 
   const launch = () => {
     if (orderedSelected.length === 0 || running) return
@@ -185,6 +193,11 @@ export function ReconPipelineSection({ project, onRunsChanged }: { project: stri
 
       {snapshot ? (
         <div className="mt-3 rounded-md border border-zinc-200 p-3 dark:border-zinc-800">
+          {progressSegments ? (
+            <div className="mb-3">
+              <ProgressBar segments={progressSegments} />
+            </div>
+          ) : null}
           <p className="text-xs">
             <span className="font-medium">{snapshot.id}</span>{' '}
             <span className={snapshot.status === 'running' ? 'text-sky-600 dark:text-sky-400' : snapshot.status === 'done' ? 'text-emerald-600 dark:text-emerald-400' : 'text-amber-600 dark:text-amber-400'}>

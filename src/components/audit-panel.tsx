@@ -1,6 +1,8 @@
 'use client'
 
 import { useCallback, useEffect, useState, useTransition } from 'react'
+import { auditPhaseProgress } from '@/core/recon/progress'
+import { ProgressBar } from '@/components/progress-bar'
 import {
   cancelAuditAction,
   getAuditRulesInfoAction,
@@ -27,6 +29,7 @@ const PHASE_LABEL: Record<string, string> = {
 export function AuditPanel({ project }: { project: string }) {
   const [runRecon, setRunRecon] = useState(true)
   const [phase, setPhase] = useState<string | null>(null)
+  const [lastRunningPhase, setLastRunningPhase] = useState<string | null>(null)
   const [rulesState, setRulesState] = useState<string | null>(null)
   const [rulesReason, setRulesReason] = useState<string | null>(null)
   const [error, setError] = useState<string | null>(null)
@@ -40,6 +43,9 @@ export function AuditPanel({ project }: { project: string }) {
       ])
       if (statusRes.ok && statusRes.status) {
         setPhase(statusRes.status.phase)
+        if (['recon', 'mision', 'agente'].includes(statusRes.status.phase)) {
+          setLastRunningPhase(statusRes.status.phase)
+        }
         if (statusRes.status.error) setError(statusRes.status.error)
       }
       if (rulesRes.ok && rulesRes.state) {
@@ -109,6 +115,9 @@ export function AuditPanel({ project }: { project: string }) {
             Estado: <span className={running ? 'text-sky-600 dark:text-sky-400' : ''}>{PHASE_LABEL[phase] ?? phase}</span>
           </p>
           <p className="mt-1 text-xs text-zinc-500 dark:text-zinc-400">recon → misión → agente</p>
+          <div className="mt-2">
+            <ProgressBar segments={auditPhaseProgress(phase, lastRunningPhase)} />
+          </div>
         </div>
       ) : null}
 
